@@ -5,7 +5,7 @@ use ble::manager::BleManagerState;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .manage(BleManagerState)
+        .manage(BleManagerState::default())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             ble::commands::ble_start_scan,

@@ -1,4 +1,4 @@
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use super::{
     manager::BleManagerState,
@@ -6,8 +6,11 @@ use super::{
 };
 
 #[tauri::command]
-pub async fn ble_start_scan(state: State<'_, BleManagerState>) -> Result<(), String> {
-    state.start_scan().await
+pub async fn ble_start_scan(
+    app_handle: AppHandle,
+    state: State<'_, BleManagerState>,
+) -> Result<(), String> {
+    state.start_scan(app_handle).await
 }
 
 #[tauri::command]
@@ -41,13 +44,14 @@ pub async fn ble_services(
 
 #[tauri::command]
 pub async fn ble_start_notify(
+    app_handle: AppHandle,
     state: State<'_, BleManagerState>,
     device_id: String,
     service_uuid: String,
     characteristic_uuid: String,
 ) -> Result<(), String> {
     state
-        .start_notify(device_id, service_uuid, characteristic_uuid)
+        .start_notify(app_handle, device_id, service_uuid, characteristic_uuid)
         .await
 }
 
@@ -114,20 +118,13 @@ async fn write(
     request: WriteRequest,
     with_response: bool,
 ) -> Result<(), String> {
-    if let Some(max_byte_size) = request.max_byte_size {
-        if request.value.len() > max_byte_size {
-            return Err(format!(
-                "BLE write payload exceeds maxByteSize of {max_byte_size} bytes"
-            ));
-        }
-    }
-
     state
         .write(
             request.device_id,
             request.service_uuid,
             request.characteristic_uuid,
             request.value,
+            request.max_byte_size,
             with_response,
         )
         .await

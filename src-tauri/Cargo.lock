@@ -892,6 +892,7 @@ name = "dt-konfig-desktop"
 version = "0.1.0"
 dependencies = [
  "btleplug",
+ "futures-util",
  "serde",
  "serde_json",
  "tauri",
