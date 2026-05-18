@@ -618,11 +618,21 @@ fn abort_tasks(tasks: Vec<async_runtime::JoinHandle<()>>) {
 }
 
 fn normalize_uuid(uuid: Uuid) -> String {
-    uuid.to_string().to_lowercase()
+    normalize_uuid_alias(&uuid.to_string())
 }
 
 fn normalize_uuid_str(uuid: &str) -> String {
-    uuid.to_lowercase()
+    normalize_uuid_alias(uuid)
+}
+
+fn normalize_uuid_alias(uuid: &str) -> String {
+    let normalized = uuid.to_lowercase();
+    normalized
+        .strip_prefix("0000")
+        .and_then(|value| value.strip_suffix("-0000-1000-8000-00805f9b34fb"))
+        .filter(|value| value.len() == 4 && value.chars().all(|character| character.is_ascii_hexdigit()))
+        .map(str::to_string)
+        .unwrap_or(normalized)
 }
 
 fn normalize_device_id(device_id: &str) -> String {
@@ -664,7 +674,8 @@ mod tests {
     use uuid::Uuid;
 
     use super::{
-        notification_keys_for_device, notification_payload, write_chunks, NotificationKey,
+        normalize_uuid_str, notification_keys_for_device, notification_payload, write_chunks,
+        NotificationKey,
     };
 
     #[test]
@@ -699,10 +710,15 @@ mod tests {
         );
 
         assert_eq!(key.device_id, "abcdef");
-        assert_eq!(key.service_uuid, "0000abcd-0000-1000-8000-00805f9b34fb");
+        assert_eq!(key.service_uuid, "abcd");
+        assert_eq!(key.characteristic_uuid, "dcba");
+    }
+
+    #[test]
+    fn normalize_uuid_str_shortens_standard_ble_uuid_aliases() {
         assert_eq!(
-            key.characteristic_uuid,
-            "0000dcba-0000-1000-8000-00805f9b34fb"
+            normalize_uuid_str("0000FFE0-0000-1000-8000-00805F9B34FB"),
+            "ffe0"
         );
     }
 
@@ -742,11 +758,8 @@ mod tests {
         );
 
         assert_eq!(payload.device_id, "UPPERCASE-ID");
-        assert_eq!(payload.service_uuid, "0000abcd-0000-1000-8000-00805f9b34fb");
-        assert_eq!(
-            payload.characteristic_uuid,
-            "0000dcba-0000-1000-8000-00805f9b34fb"
-        );
+        assert_eq!(payload.service_uuid, "abcd");
+        assert_eq!(payload.characteristic_uuid, "dcba");
         assert_eq!(payload.value, vec![1, 2, 3]);
     }
 }
