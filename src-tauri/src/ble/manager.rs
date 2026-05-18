@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use btleplug::{
@@ -13,6 +13,7 @@ use btleplug::{
 };
 use futures_util::StreamExt;
 use tauri::{async_runtime, AppHandle, Emitter};
+use tokio::time::sleep;
 use tokio::sync::oneshot;
 use uuid::Uuid;
 
@@ -115,7 +116,9 @@ impl BleManagerState {
     }
 
     pub async fn connect(&self, device_id: String) -> Result<(), String> {
-        let peripheral = self.peripheral(&device_id).await?;
+        let adapter = self.adapter().await?;
+        let should_refresh_cache = !self.inner.lock().await.scanning;
+        let peripheral = peripheral_with_cache_refresh(&adapter, &device_id, should_refresh_cache).await?;
 
         if !peripheral.is_connected().await.map_err(format_ble_error)? {
             peripheral.connect().await.map_err(format_ble_error)?;
@@ -458,12 +461,41 @@ async fn clear_notification_session(
 }
 
 async fn peripheral(adapter: &Adapter, device_id: &str) -> Result<Peripheral, String> {
+    find_peripheral(adapter, device_id)
+        .await?
+        .ok_or_else(|| format!("BLE device not found: {device_id}"))
+}
+
+async fn peripheral_with_cache_refresh(
+    adapter: &Adapter,
+    device_id: &str,
+    should_refresh_cache: bool,
+) -> Result<Peripheral, String> {
+    if let Some(peripheral) = find_peripheral(adapter, device_id).await? {
+        return Ok(peripheral);
+    }
+
+    if should_refresh_cache {
+        let _ = adapter.start_scan(ScanFilter::default()).await;
+        sleep(Duration::from_millis(1_500)).await;
+        let peripheral = find_peripheral(adapter, device_id).await?;
+        let _ = adapter.stop_scan().await;
+
+        if let Some(peripheral) = peripheral {
+            return Ok(peripheral);
+        }
+    }
+
+    Err(format!("BLE device not found: {device_id}"))
+}
+
+async fn find_peripheral(adapter: &Adapter, device_id: &str) -> Result<Option<Peripheral>, String> {
     let peripherals = adapter.peripherals().await.map_err(format_ble_error)?;
 
-    peripherals
+    Ok(peripherals
         .into_iter()
         .find(|peripheral| ids_match(&peripheral.id().to_string(), device_id))
-        .ok_or_else(|| format!("BLE device not found: {device_id}"))
+    )
 }
 
 async fn characteristic(

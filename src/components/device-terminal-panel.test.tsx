@@ -1,4 +1,4 @@
-import { render, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { BleCharacteristic, BleClient, BleDevice, BleNotification } from "../lib/ble/types";
 import { DeviceTerminalPanel } from "./device-terminal-panel";
@@ -51,5 +51,16 @@ describe("DeviceTerminalPanel", () => {
     render(<DeviceTerminalPanel device={device} bleClient={client} autoConnect />);
 
     await waitFor(() => expect(client.connectCalls).toEqual(["device-1"]));
+  });
+
+  it("does not render the password stage helper as a command button", async () => {
+    const client = new PanelTestClient();
+
+    render(<DeviceTerminalPanel device={device} bleClient={client} autoConnect />);
+
+    await waitFor(() => expect(client.connectCalls).toEqual(["device-1"]));
+    fireEvent.click(screen.getByRole("button", { name: "Comandos" }));
+
+    expect(screen.queryByRole("button", { name: "Senha do dispositivo" })).not.toBeInTheDocument();
   });
 });

@@ -1,4 +1,4 @@
-import { ArrowDownAZ, ArrowUpAZ, Pin, RefreshCw, Search, SlidersHorizontal, Star } from "lucide-react";
+import { RefreshCw, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { BleDevice } from "../lib/ble/types";
 import type { KhompDeviceType } from "../lib/constants";
@@ -16,8 +16,6 @@ type DeviceSidebarProps = {
   onStartScan: () => void;
   onSelectDevice: (device: BleDevice) => void;
 };
-
-type SortMode = "recent" | "name" | "rssi";
 
 function getDeviceName(device: BleDevice): string {
   return device.name ?? device.localName ?? "Dispositivo sem nome";
@@ -47,12 +45,7 @@ export function DeviceSidebar({
   onSelectDevice,
 }: DeviceSidebarProps) {
   const [query, setQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<KhompDeviceType | "all">("all");
-  const [sortMode, setSortMode] = useState<SortMode>("recent");
-  const [pinnedOnly, setPinnedOnly] = useState(false);
-  const pinnedDeviceIds = useBleDevicesStore((state) => state.pinnedDeviceIds);
   const isDeviceOnline = useBleDevicesStore((state) => state.isDeviceOnline);
-  const togglePinnedDevice = useBleDevicesStore((state) => state.togglePinnedDevice);
 
   const filteredDevices = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -63,14 +56,6 @@ export function DeviceSidebar({
           return false;
         }
 
-        if (typeFilter !== "all" && type !== typeFilter) {
-          return false;
-        }
-
-        if (pinnedOnly && !pinnedDeviceIds.includes(device.id)) {
-          return false;
-        }
-
         if (!normalizedQuery) {
           return true;
         }
@@ -78,18 +63,8 @@ export function DeviceSidebar({
         return `${getDeviceName(device)} ${device.id}`.toLowerCase().includes(normalizedQuery);
       });
 
-    return [...visibleDevices].sort((first, second) => {
-      if (sortMode === "name") {
-        return getDeviceName(first).localeCompare(getDeviceName(second));
-      }
-
-      if (sortMode === "rssi") {
-        return second.rssi - first.rssi;
-      }
-
-      return second.lastSeenAt - first.lastSeenAt;
-    });
-  }, [devices, pinnedDeviceIds, pinnedOnly, query, sortMode, typeFilter]);
+    return [...visibleDevices].sort((first, second) => second.lastSeenAt - first.lastSeenAt);
+  }, [devices, query]);
 
   return (
     <aside className="device-sidebar" aria-label="Dispositivos BLE">
@@ -130,50 +105,13 @@ export function DeviceSidebar({
         />
       </label>
 
-      <div className="filter-grid">
-        <label>
-          <span>Tipo</span>
-          <select
-            value={typeFilter}
-            onChange={(event) => setTypeFilter(event.target.value as KhompDeviceType | "all")}
-          >
-            <option value="all">Todos</option>
-            <option value="DTN_NB">DTN NB</option>
-            <option value="DTL_LORA">DTL LoRa</option>
-          </select>
-        </label>
-        <label>
-          <span>Ordenar</span>
-          <select value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
-            <option value="recent">Recentes</option>
-            <option value="name">Nome</option>
-            <option value="rssi">Sinal</option>
-          </select>
-        </label>
-      </div>
-
-      <div className="toggle-row">
-        <SlidersHorizontal size={16} />
-        <span>Somente fixados</span>
-        <button
-          type="button"
-          className={`toggle-switch ${pinnedOnly ? "active" : ""}`}
-          onClick={() => setPinnedOnly((value) => !value)}
-          aria-pressed={pinnedOnly}
-        >
-          <span />
-        </button>
-      </div>
-
       <div className="sort-hint">
-        {sortMode === "name" ? <ArrowDownAZ size={14} /> : <ArrowUpAZ size={14} />}
         <span>{filteredDevices.length} compativeis</span>
       </div>
 
       <div className="device-list">
         {filteredDevices.map((device) => {
           const type = getDeviceType(device);
-          const isPinned = pinnedDeviceIds.includes(device.id);
           const isOnline = isDeviceOnline(device.id);
 
           return (
@@ -192,14 +130,6 @@ export function DeviceSidebar({
                 <span>{type ? getKhompDeviceTypeLabel(type) : "Khomp"}</span>
                 <span>{isOnline ? `${device.rssi} dBm` : formatLastSeen(device.lastSeenAt)}</span>
               </div>
-              <button
-                type="button"
-                className={`pin-button ${isPinned ? "active" : ""}`}
-                onClick={() => togglePinnedDevice(device.id)}
-                title={isPinned ? "Desafixar dispositivo" : "Fixar dispositivo"}
-              >
-                {isPinned ? <Star size={16} fill="currentColor" /> : <Pin size={16} />}
-              </button>
             </article>
           );
         })}

@@ -82,6 +82,10 @@ export function DeviceTerminalPanel({ device, bleClient, stopScan, autoConnect =
     const pinnedIds = pinnedByDevice[device.id] ?? [];
     return commands.filter((command) => pinnedIds.includes(command.id));
   }, [commandsByDevice, device, pinnedByDevice]);
+  const visibleCommandOptions = useMemo(
+    () => commandOptions.filter((option) => option.command.trim().length > 0),
+    [commandOptions],
+  );
 
   function insertCommand(command: string) {
     setInputValue(command);
@@ -217,17 +221,21 @@ export function DeviceTerminalPanel({ device, bleClient, stopScan, autoConnect =
                 )}
               </div>
 
-              <div className="quick-command-bar secondary" aria-label="Comandos da etapa">
-                {commandOptions.map((option) => (
-                  <button
-                    type="button"
-                    key={`${option.command}-${option.label}`}
-                    onClick={() => (option.requiresValue ? insertCommand(option.command) : void sendCommand(option.command))}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
+              {visibleCommandOptions.length ? (
+                <div className="quick-command-bar secondary" aria-label="Comandos da etapa">
+                  {visibleCommandOptions.map((option) => (
+                    <button
+                      type="button"
+                      key={`${option.command}-${option.label}`}
+                      onClick={() =>
+                        option.requiresValue ? insertCommand(option.command) : void sendCommand(option.command)
+                      }
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
 
             <CommandManager
