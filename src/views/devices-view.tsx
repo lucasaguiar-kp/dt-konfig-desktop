@@ -29,8 +29,7 @@ export function DevicesView() {
         onStopScan={() => void stopScan()}
         onSelectDevice={selectDevice}
       />
-      <DeviceTerminalPanel device={selectedDevice} stopScan={stopScan} />
+      <DeviceTerminalPanel device={selectedDevice} stopScan={stopScan} autoConnect />
     </div>
   );
 }
-

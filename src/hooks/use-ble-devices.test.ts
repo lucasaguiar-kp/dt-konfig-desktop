@@ -46,6 +46,14 @@ class TestBleClient implements BleClient {
 }
 
 describe("useBleDevices", () => {
+  it("waits for an explicit startScan by default", async () => {
+    const client = new TestBleClient();
+
+    renderHook(() => useBleDevices({ client }));
+
+    await waitFor(() => expect(client.startScanCalls).toBe(0));
+  });
+
   it("does not set scanning after stopScan invalidates an in-flight startScan", async () => {
     const client = new TestBleClient();
     const { result } = renderHook(() => useBleDevices({ client, autoStart: false }));
@@ -72,4 +80,3 @@ describe("useBleDevices", () => {
     expect(client.stopScanCalls).toBe(1);
   });
 });
-

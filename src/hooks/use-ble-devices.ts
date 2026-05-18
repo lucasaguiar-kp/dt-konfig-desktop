@@ -29,7 +29,7 @@ function isCompatibleDevice(device: BleDevice): boolean {
 
 export function useBleDevices(options: UseBleDevicesOptions = {}) {
   const client = options.client ?? tauriBleClient;
-  const autoStart = options.autoStart ?? true;
+  const autoStart = options.autoStart ?? false;
   const [scanStatus, setScanStatus] = useState<ScanStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const addOrUpdateDevice = useBleDevicesStore((state) => state.addOrUpdateDevice);

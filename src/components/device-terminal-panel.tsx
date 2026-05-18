@@ -1,5 +1,5 @@
 import { Copy, Link, PlugZap, Send, Terminal, Unplug } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { BleClient, BleDevice } from "../lib/ble/types";
 import { getKhompDeviceType, getKhompDeviceTypeLabel } from "../lib/constants";
 import { useDeviceTerminal } from "../hooks/use-device-terminal";
@@ -10,6 +10,7 @@ type DeviceTerminalPanelProps = {
   device: BleDevice | null;
   bleClient?: BleClient;
   stopScan?: () => Promise<void>;
+  autoConnect?: boolean;
 };
 
 function getDeviceName(device: BleDevice): string {
@@ -24,9 +25,10 @@ function formatTimestamp(value: number): string {
   }).format(value);
 }
 
-export function DeviceTerminalPanel({ device, bleClient, stopScan }: DeviceTerminalPanelProps) {
+export function DeviceTerminalPanel({ device, bleClient, stopScan, autoConnect = false }: DeviceTerminalPanelProps) {
   const deviceType = device ? getKhompDeviceType(device.name ?? device.localName) : null;
   const [inputValue, setInputValue] = useState("");
+  const lastAutoConnectDeviceIdRef = useRef<string | null>(null);
   const {
     status,
     error,
@@ -55,6 +57,20 @@ export function DeviceTerminalPanel({ device, bleClient, stopScan }: DeviceTermi
       ensureDeviceCommands(device.id);
     }
   }, [device, ensureDeviceCommands]);
+
+  useEffect(() => {
+    if (!device) {
+      lastAutoConnectDeviceIdRef.current = null;
+      return;
+    }
+
+    if (!autoConnect || lastAutoConnectDeviceIdRef.current === device.id) {
+      return;
+    }
+
+    lastAutoConnectDeviceIdRef.current = device.id;
+    void connect();
+  }, [autoConnect, connect, device]);
 
   const pinnedCommands = useMemo(() => {
     if (!device) {
@@ -126,34 +142,6 @@ export function DeviceTerminalPanel({ device, bleClient, stopScan }: DeviceTermi
 
       {error ? <p className="inline-error">{error}</p> : null}
 
-      <div className="quick-command-bar" aria-label="Comandos fixados">
-        {pinnedCommands.length ? (
-          pinnedCommands.map((command) => (
-            <button
-              type="button"
-              key={command.id}
-              onClick={() => (command.requiresValue ? insertCommand(command.command) : void sendCommand(command.command))}
-            >
-              {command.command}
-            </button>
-          ))
-        ) : (
-          <span>Nenhum comando fixado</span>
-        )}
-      </div>
-
-      <div className="quick-command-bar secondary" aria-label="Comandos da etapa">
-        {commandOptions.map((option) => (
-          <button
-            type="button"
-            key={`${option.command}-${option.label}`}
-            onClick={() => (option.requiresValue ? insertCommand(option.command) : void sendCommand(option.command))}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-
       <div className="terminal-history" aria-label="Historico do terminal">
         {history.length ? (
           history.map((entry) => (
@@ -186,6 +174,36 @@ export function DeviceTerminalPanel({ device, bleClient, stopScan }: DeviceTermi
         </button>
       </form>
 
+      <div className="terminal-command-strip">
+        <div className="quick-command-bar" aria-label="Comandos fixados">
+          {pinnedCommands.length ? (
+            pinnedCommands.map((command) => (
+              <button
+                type="button"
+                key={command.id}
+                onClick={() => (command.requiresValue ? insertCommand(command.command) : void sendCommand(command.command))}
+              >
+                {command.command}
+              </button>
+            ))
+          ) : (
+            <span>Nenhum comando fixado</span>
+          )}
+        </div>
+
+        <div className="quick-command-bar secondary" aria-label="Comandos da etapa">
+          {commandOptions.map((option) => (
+            <button
+              type="button"
+              key={`${option.command}-${option.label}`}
+              onClick={() => (option.requiresValue ? insertCommand(option.command) : void sendCommand(option.command))}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <CommandManager deviceId={device.id} onInsertCommand={insertCommand} onSendCommand={(command) => void sendCommand(command)} />
       <div className="terminal-footer-note">
         <Link size={14} />
@@ -194,4 +212,3 @@ export function DeviceTerminalPanel({ device, bleClient, stopScan }: DeviceTermi
     </section>
   );
 }
-

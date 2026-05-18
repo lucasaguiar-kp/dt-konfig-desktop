@@ -209,6 +209,12 @@ button:disabled {
     font-weight: 700;
   }
 
+  .control-button:disabled,
+  .icon-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+  }
+
   .control-button.primary,
   .icon-button.primary {
     border-color: var(--accent);
@@ -472,7 +478,6 @@ button:disabled {
 
   .quick-command-bar {
     min-height: 38px;
-    margin-top: 12px;
     display: flex;
     gap: 8px;
     overflow-x: auto;
@@ -480,7 +485,7 @@ button:disabled {
   }
 
   .quick-command-bar.secondary {
-    margin-top: 8px;
+    min-height: 34px;
   }
 
   .quick-command-bar button {
@@ -500,9 +505,9 @@ button:disabled {
   }
 
   .terminal-history {
-    min-height: 180px;
+    min-height: 320px;
     flex: 1;
-    margin-top: 12px;
+    margin-top: 14px;
     padding: 12px;
     border: 1px solid #303844;
     border-radius: 8px;
@@ -588,9 +593,19 @@ button:disabled {
     background: #ffffff;
   }
 
+  .terminal-command-strip {
+    display: grid;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #f7f9fb;
+  }
+
   .command-manager {
-    margin-top: 14px;
-    padding-top: 14px;
+    margin-top: 12px;
+    padding-top: 12px;
     border-top: 1px solid var(--border);
   }
 
@@ -617,7 +632,7 @@ button:disabled {
   }
 
   .command-list {
-    max-height: 220px;
+    max-height: 128px;
     margin-top: 10px;
     display: grid;
     gap: 8px;

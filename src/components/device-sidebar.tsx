@@ -102,13 +102,19 @@ export function DeviceSidebar({
       </div>
 
       <div className="scan-actions" aria-label="Controles de scan">
-        <button type="button" className="icon-button primary" onClick={onRefresh} title="Atualizar scan">
+        <button
+          type="button"
+          className="icon-button primary"
+          onClick={onRefresh}
+          title="Reiniciar scan"
+          disabled={scanStatus === "scanning"}
+        >
           <RefreshCw size={18} />
         </button>
-        <button type="button" className="control-button" onClick={onStartScan}>
+        <button type="button" className="control-button" onClick={onStartScan} disabled={scanStatus === "scanning"}>
           Iniciar
         </button>
-        <button type="button" className="control-button" onClick={onStopScan}>
+        <button type="button" className="control-button" onClick={onStopScan} disabled={scanStatus === "idle"}>
           Parar
         </button>
       </div>
