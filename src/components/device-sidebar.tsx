@@ -10,10 +10,10 @@ type DeviceSidebarProps = {
   devices: BleDevice[];
   selectedDeviceId: string | null;
   scanStatus: ScanStatus;
+  scanRemainingSeconds: number;
   scanError: string | null;
   onRefresh: () => void;
   onStartScan: () => void;
-  onStopScan: () => void;
   onSelectDevice: (device: BleDevice) => void;
 };
 
@@ -40,10 +40,10 @@ export function DeviceSidebar({
   devices,
   selectedDeviceId,
   scanStatus,
+  scanRemainingSeconds,
   scanError,
   onRefresh,
   onStartScan,
-  onStopScan,
   onSelectDevice,
 }: DeviceSidebarProps) {
   const [query, setQuery] = useState("");
@@ -98,7 +98,9 @@ export function DeviceSidebar({
           <p className="eyebrow">BLE scan</p>
           <h2>Dispositivos</h2>
         </div>
-        <div className={`scan-pill scan-pill-${scanStatus}`}>{scanStatus}</div>
+        <div className={`scan-pill scan-pill-${scanStatus}`}>
+          {scanStatus === "scanning" ? `${scanRemainingSeconds}s` : scanStatus}
+        </div>
       </div>
 
       <div className="scan-actions" aria-label="Controles de scan">
@@ -106,16 +108,13 @@ export function DeviceSidebar({
           type="button"
           className="icon-button primary"
           onClick={onRefresh}
-          title="Reiniciar scan"
+          title="Reiniciar scan de 20 segundos"
           disabled={scanStatus === "scanning"}
         >
           <RefreshCw size={18} />
         </button>
         <button type="button" className="control-button" onClick={onStartScan} disabled={scanStatus === "scanning"}>
-          Iniciar
-        </button>
-        <button type="button" className="control-button" onClick={onStopScan} disabled={scanStatus === "idle"}>
-          Parar
+          {scanStatus === "scanning" ? "Escaneando" : "Iniciar scan"}
         </button>
       </div>
 

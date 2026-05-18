@@ -1,4 +1,4 @@
-import { Copy, Link, PlugZap, Send, Terminal, Unplug } from "lucide-react";
+import { Copy, PlugZap, Send, Settings, Terminal, Unplug, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { BleClient, BleDevice } from "../lib/ble/types";
 import { getKhompDeviceType, getKhompDeviceTypeLabel } from "../lib/constants";
@@ -28,6 +28,7 @@ function formatTimestamp(value: number): string {
 export function DeviceTerminalPanel({ device, bleClient, stopScan, autoConnect = false }: DeviceTerminalPanelProps) {
   const deviceType = device ? getKhompDeviceType(device.name ?? device.localName) : null;
   const [inputValue, setInputValue] = useState("");
+  const [isCommandsOpen, setIsCommandsOpen] = useState(false);
   const lastAutoConnectDeviceIdRef = useRef<string | null>(null);
   const {
     status,
@@ -121,6 +122,10 @@ export function DeviceTerminalPanel({ device, bleClient, stopScan, autoConnect =
           <button type="button" className="icon-button" onClick={copyTerminal} title="Copiar terminal">
             <Copy size={18} />
           </button>
+          <button type="button" className="control-button" onClick={() => setIsCommandsOpen(true)}>
+            <Settings size={17} />
+            Comandos
+          </button>
           {status === "connected" ? (
             <button type="button" className="icon-button" onClick={() => void disconnect()} title="Desconectar">
               <Unplug size={18} />
@@ -174,41 +179,71 @@ export function DeviceTerminalPanel({ device, bleClient, stopScan, autoConnect =
         </button>
       </form>
 
-      <div className="terminal-command-strip">
-        <div className="quick-command-bar" aria-label="Comandos fixados">
-          {pinnedCommands.length ? (
-            pinnedCommands.map((command) => (
-              <button
-                type="button"
-                key={command.id}
-                onClick={() => (command.requiresValue ? insertCommand(command.command) : void sendCommand(command.command))}
-              >
-                {command.command}
+      {isCommandsOpen ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setIsCommandsOpen(false)}>
+          <section
+            className="command-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Comandos do dispositivo"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <p className="eyebrow">Terminal BLE</p>
+                <h3>Comandos</h3>
+              </div>
+              <button type="button" className="icon-button" onClick={() => setIsCommandsOpen(false)} title="Fechar">
+                <X size={18} />
               </button>
-            ))
-          ) : (
-            <span>Nenhum comando fixado</span>
-          )}
-        </div>
+            </div>
 
-        <div className="quick-command-bar secondary" aria-label="Comandos da etapa">
-          {commandOptions.map((option) => (
-            <button
-              type="button"
-              key={`${option.command}-${option.label}`}
-              onClick={() => (option.requiresValue ? insertCommand(option.command) : void sendCommand(option.command))}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
+            <div className="terminal-command-strip">
+              <div className="quick-command-bar" aria-label="Comandos fixados">
+                {pinnedCommands.length ? (
+                  pinnedCommands.map((command) => (
+                    <button
+                      type="button"
+                      key={command.id}
+                      onClick={() =>
+                        command.requiresValue ? insertCommand(command.command) : void sendCommand(command.command)
+                      }
+                    >
+                      {command.command}
+                    </button>
+                  ))
+                ) : (
+                  <span>Nenhum comando fixado</span>
+                )}
+              </div>
 
-      <CommandManager deviceId={device.id} onInsertCommand={insertCommand} onSendCommand={(command) => void sendCommand(command)} />
-      <div className="terminal-footer-note">
-        <Link size={14} />
-        Backend BLE pode retornar unsupported enquanto a camada nativa nao estiver ativa.
-      </div>
+              <div className="quick-command-bar secondary" aria-label="Comandos da etapa">
+                {commandOptions.map((option) => (
+                  <button
+                    type="button"
+                    key={`${option.command}-${option.label}`}
+                    onClick={() => (option.requiresValue ? insertCommand(option.command) : void sendCommand(option.command))}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <CommandManager
+              deviceId={device.id}
+              onInsertCommand={(command) => {
+                insertCommand(command);
+                setIsCommandsOpen(false);
+              }}
+              onSendCommand={(command) => {
+                void sendCommand(command);
+                setIsCommandsOpen(false);
+              }}
+            />
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }

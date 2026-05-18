@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BleCharacteristic, BleClient, BleDevice, BleNotification } from "../lib/ble/types";
 import { useBleDevices } from "./use-ble-devices";
 
@@ -46,6 +46,10 @@ class TestBleClient implements BleClient {
 }
 
 describe("useBleDevices", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("waits for an explicit startScan by default", async () => {
     const client = new TestBleClient();
 
@@ -78,5 +82,32 @@ describe("useBleDevices", () => {
 
     expect(result.current.scanStatus).toBe("idle");
     expect(client.stopScanCalls).toBe(1);
+  });
+
+  it("stops scan automatically after the desktop scan window", async () => {
+    vi.useFakeTimers();
+    const client = new TestBleClient();
+    const { result } = renderHook(() => useBleDevices({ client }));
+    let startPromise: Promise<void>;
+
+    act(() => {
+      startPromise = result.current.startScan();
+    });
+
+    client.startScanDeferred.resolve();
+    await act(async () => {
+      await startPromise;
+    });
+
+    expect(result.current.scanStatus).toBe("scanning");
+    expect(result.current.scanRemainingSeconds).toBe(20);
+
+    await act(async () => {
+      vi.advanceTimersByTime(20_000);
+    });
+
+    expect(client.stopScanCalls).toBe(1);
+    expect(result.current.scanStatus).toBe("idle");
+    expect(result.current.scanRemainingSeconds).toBe(0);
   });
 });

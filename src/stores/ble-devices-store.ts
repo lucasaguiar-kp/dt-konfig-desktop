@@ -94,32 +94,14 @@ export const useBleDevicesStore = create<BleDevicesStore>()(
         },
 
         removeStaleDevices: () => {
-          const now = Date.now();
           set((state) => {
-            const devices = new Map(state.devices);
-
-            for (const [id, deviceData] of devices.entries()) {
-              if (!isFresh(deviceData, now) && !state.pinnedDeviceIds.includes(id)) {
-                devices.delete(id);
-              }
-            }
-
-            return { devices };
+            return { devices: new Map(state.devices) };
           });
         },
 
         clearDevices: () => {
-          const now = Date.now();
           set((state) => {
-            const devices = new Map<string, DeviceWithTimestamp>();
-
-            for (const [id, deviceData] of state.devices.entries()) {
-              if (state.pinnedDeviceIds.includes(id) && isFresh(deviceData, now)) {
-                devices.set(id, deviceData);
-              }
-            }
-
-            return { devices };
+            return { devices: new Map(state.devices) };
           });
         },
 

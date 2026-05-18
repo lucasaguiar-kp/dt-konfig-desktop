@@ -59,7 +59,7 @@ describe("useBleDevicesStore", () => {
     ]);
   });
 
-  it("removes stale unpinned devices but keeps pinned devices available", () => {
+  it("keeps stale unpinned devices visible as offline snapshots", () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_000);
 
@@ -70,11 +70,12 @@ describe("useBleDevicesStore", () => {
     vi.setSystemTime(32_000);
     useBleDevicesStore.getState().removeStaleDevices();
 
-    expect(useBleDevicesStore.getState().getDevicesList().map((device) => device.id)).toEqual(["pinned"]);
+    expect(useBleDevicesStore.getState().getDevicesList().map((device) => device.id)).toEqual(["stale", "pinned"]);
+    expect(useBleDevicesStore.getState().isDeviceOnline("stale")).toBe(false);
     expect(useBleDevicesStore.getState().isDeviceOnline("pinned")).toBe(false);
   });
 
-  it("clears devices while preserving pinned online devices", () => {
+  it("keeps discovered devices visible when starting a new scan", () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_000);
 
@@ -84,8 +85,9 @@ describe("useBleDevicesStore", () => {
 
     useBleDevicesStore.getState().clearDevices();
 
-    expect(Array.from(useBleDevicesStore.getState().devices.keys())).toEqual(["pinned"]);
-    expect(useBleDevicesStore.getState().getDevicesList().map((device) => device.id)).toEqual(["pinned"]);
+    expect(Array.from(useBleDevicesStore.getState().devices.keys())).toEqual(["unpinned", "pinned"]);
+    expect(useBleDevicesStore.getState().getDevicesList().map((device) => device.id)).toEqual(["unpinned", "pinned"]);
+    expect(useBleDevicesStore.getState().isDeviceOnline("unpinned")).toBe(true);
     expect(useBleDevicesStore.getState().isDeviceOnline("pinned")).toBe(true);
   });
 

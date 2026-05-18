@@ -5,7 +5,7 @@ import type { BleDevice } from "../lib/ble/types";
 import { useBleDevices } from "../hooks/use-ble-devices";
 
 export function DevicesView() {
-  const { devices, scanStatus, error, startScan, stopScan, refreshScan } = useBleDevices();
+  const { devices, scanStatus, scanRemainingSeconds, error, startScan, refreshScan } = useBleDevices();
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
 
   const selectedDevice = useMemo(
@@ -23,13 +23,13 @@ export function DevicesView() {
         devices={devices}
         selectedDeviceId={selectedDeviceId}
         scanStatus={scanStatus}
+        scanRemainingSeconds={scanRemainingSeconds}
         scanError={error}
         onRefresh={() => void refreshScan()}
         onStartScan={() => void startScan()}
-        onStopScan={() => void stopScan()}
         onSelectDevice={selectDevice}
       />
-      <DeviceTerminalPanel device={selectedDevice} stopScan={stopScan} autoConnect />
+      <DeviceTerminalPanel device={selectedDevice} autoConnect />
     </div>
   );
 }
