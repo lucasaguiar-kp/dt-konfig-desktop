@@ -649,4 +649,170 @@ button:disabled {
     color: var(--muted);
     font-size: 12px;
   }
+
+  .ota-view {
+    min-height: calc(100vh - 36px);
+    display: grid;
+    grid-template-columns: minmax(420px, 0.9fr) minmax(440px, 1.1fr);
+    gap: 18px;
+  }
+
+  .ota-panel {
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    padding: 20px;
+  }
+
+  .ota-form-panel {
+    align-self: start;
+    display: grid;
+    gap: 18px;
+  }
+
+  .ota-header,
+  .ota-status-heading,
+  .ota-progress-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .ota-header h2,
+  .ota-status-heading h2 {
+    margin: 0;
+    font-size: 24px;
+    line-height: 1.15;
+  }
+
+  .ota-field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .ota-field {
+    display: grid;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .ota-field input {
+    height: 42px;
+    width: 100%;
+    min-width: 0;
+    padding: 0 11px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: #ffffff;
+    color: var(--foreground);
+    font-weight: 500;
+    text-transform: none;
+  }
+
+  .ota-file-picker {
+    min-height: 74px;
+    padding: 14px;
+    border: 1px dashed #aeb8c5;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f7f9fb;
+    color: var(--foreground);
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+
+  .ota-file-picker input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+
+  .ota-action-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  .ota-start-button {
+    width: 100%;
+  }
+
+  .ota-status-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .ota-progress-track {
+    height: 14px;
+    flex: 1;
+    border-radius: 999px;
+    overflow: hidden;
+    background: #e1e7ee;
+  }
+
+  .ota-progress-track span {
+    height: 100%;
+    display: block;
+    border-radius: inherit;
+    background: var(--accent);
+    transition: width 180ms ease;
+  }
+
+  .ota-progress-row strong {
+    width: 48px;
+    text-align: right;
+  }
+
+  .ota-status-text {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.45;
+  }
+
+  .ota-checklist {
+    display: grid;
+    gap: 8px;
+    margin-top: auto;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .ota-checklist span {
+    min-height: 34px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    background: #f8fafc;
+  }
+
+  .success-icon {
+    color: var(--success);
+  }
+
+  .danger-icon {
+    color: var(--danger);
+  }
+
+  .spin {
+    animation: spin 900ms linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
 }
