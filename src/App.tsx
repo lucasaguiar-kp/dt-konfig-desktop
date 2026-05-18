@@ -1,15 +1,28 @@
 import "./styles.css";
+import { Radio, UploadCloud } from "lucide-react";
+import { DevicesView } from "./views/devices-view";
 
 export function App() {
   return (
     <main className="app-shell">
-      <aside className="sidebar">
-        <h1>DT Konfig</h1>
-        <p>Desktop</p>
-      </aside>
+      <nav className="global-nav" aria-label="Navegacao principal">
+        <div className="brand-block">
+          <h1>DT Konfig</h1>
+          <p>Desktop</p>
+        </div>
+        <div className="nav-links">
+          <button type="button" className="nav-link active">
+            <Radio size={18} />
+            Devices
+          </button>
+          <button type="button" className="nav-link" disabled>
+            <UploadCloud size={18} />
+            OTA
+          </button>
+        </div>
+      </nav>
       <section className="workspace">
-        <h2>Inicializando aplicativo desktop</h2>
-        <p>BLE, terminal e OTA serao adicionados nas proximas etapas.</p>
+        <DevicesView />
       </section>
     </main>
   );

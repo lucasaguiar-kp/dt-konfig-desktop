@@ -7,10 +7,7 @@ describe("App", () => {
     render(<App />);
 
     expect(screen.getByRole("heading", { name: "DT Konfig" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", {
-        name: "Inicializando aplicativo desktop",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Dispositivos" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Nenhum dispositivo selecionado" })).toBeInTheDocument();
   });
 });
