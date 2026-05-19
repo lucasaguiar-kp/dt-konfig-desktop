@@ -91,6 +91,35 @@ describe("useBleDevicesStore", () => {
     expect(useBleDevicesStore.getState().isDeviceOnline("pinned")).toBe(true);
   });
 
+  it("refreshes the BLE id when the same device is rediscovered", () => {
+    useBleDevicesStore.getState().addOrUpdateDevice(
+      createDevice({
+        id: "old-ble-id",
+        name: "861275072547918",
+        localName: null,
+      }),
+    );
+
+    useBleDevicesStore.getState().addOrUpdateDevice(
+      createDevice({
+        id: "new-ble-id",
+        name: "861275072547918",
+        localName: null,
+        rssi: -44,
+      }),
+    );
+
+    expect(useBleDevicesStore.getState().getDevicesList()).toEqual([
+      expect.objectContaining({
+        id: "new-ble-id",
+        name: "861275072547918",
+        rssi: -44,
+      }),
+    ]);
+    expect(useBleDevicesStore.getState().isDeviceOnline("new-ble-id")).toBe(true);
+    expect(useBleDevicesStore.getState().isDeviceOnline("old-ble-id")).toBe(false);
+  });
+
   it("persists only pinned ids and pinned snapshots", async () => {
     useBleDevicesStore.getState().addOrUpdateDevice(createDevice({ id: "unpinned" }));
     useBleDevicesStore.getState().addOrUpdateDevice(createDevice({ id: "pinned", name: "Pinned" }));

@@ -1,5 +1,6 @@
-import { RefreshCw, Search } from "lucide-react";
+import { Bluetooth, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { getBleDeviceIdentity } from "../lib/ble/device-identity";
 import type { BleDevice } from "../lib/ble/types";
 import type { KhompDeviceType } from "../lib/constants";
 import { getKhompDeviceType, getKhompDeviceTypeLabel } from "../lib/constants";
@@ -8,7 +9,7 @@ import { useBleDevicesStore } from "../stores/ble-devices-store";
 
 type DeviceSidebarProps = {
   devices: BleDevice[];
-  selectedDeviceId: string | null;
+  selectedDeviceKey: string | null;
   scanStatus: ScanStatus;
   scanRemainingSeconds: number;
   scanError: string | null;
@@ -34,9 +35,34 @@ function formatLastSeen(value: number): string {
   return seconds < 3 ? "agora" : `${seconds}s`;
 }
 
+function formatShortId(value: string): string {
+  if (value.length <= 16) {
+    return value;
+  }
+
+  return `${value.slice(0, 8)}...${value.slice(-4)}`;
+}
+
+function getSignalBars(rssi: number): number {
+  if (rssi >= -55) return 4;
+  if (rssi >= -67) return 3;
+  if (rssi >= -78) return 2;
+  return 1;
+}
+
+function SignalBars({ level }: { level: number }) {
+  return (
+    <span className="signal-bars" aria-hidden="true">
+      {[1, 2, 3, 4].map((bar) => (
+        <span key={bar} className={bar <= level ? "active" : ""} />
+      ))}
+    </span>
+  );
+}
+
 export function DeviceSidebar({
   devices,
-  selectedDeviceId,
+  selectedDeviceKey,
   scanStatus,
   scanRemainingSeconds,
   scanError,
@@ -46,6 +72,8 @@ export function DeviceSidebar({
 }: DeviceSidebarProps) {
   const [query, setQuery] = useState("");
   const isDeviceOnline = useBleDevicesStore((state) => state.isDeviceOnline);
+  const onlineDeviceCount = devices.filter((device) => isDeviceOnline(device.id)).length;
+  const scanProgress = scanStatus === "scanning" ? Math.max(0, Math.min(100, (scanRemainingSeconds / 20) * 100)) : 0;
 
   const filteredDevices = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -60,7 +88,7 @@ export function DeviceSidebar({
           return true;
         }
 
-        return `${getDeviceName(device)} ${device.id}`.toLowerCase().includes(normalizedQuery);
+        return `${getDeviceName(device)} ${device.localName ?? ""} ${device.id}`.toLowerCase().includes(normalizedQuery);
       });
 
     return [...visibleDevices].sort((first, second) => second.lastSeenAt - first.lastSeenAt);
@@ -68,67 +96,79 @@ export function DeviceSidebar({
 
   return (
     <aside className="device-sidebar" aria-label="Dispositivos BLE">
-      <div className="sidebar-header">
-        <div>
-          <p className="eyebrow">BLE scan</p>
-          <h2>Dispositivos</h2>
-        </div>
-        <div className={`scan-pill scan-pill-${scanStatus}`}>
-          {scanStatus === "scanning" ? `${scanRemainingSeconds}s` : scanStatus}
-        </div>
-      </div>
-
-      <div className="scan-actions" aria-label="Controles de scan">
+      <div className="scan-box">
         <button
           type="button"
-          className="icon-button primary"
-          onClick={onRefresh}
-          title="Reiniciar scan de 20 segundos"
+          className={scanStatus === "scanning" ? "scan-button active" : "scan-button"}
+          onClick={scanStatus === "error" ? onRefresh : onStartScan}
           disabled={scanStatus === "scanning"}
+          title="Executar scan BLE de 20 segundos"
         >
-          <RefreshCw size={18} />
+          <Bluetooth size={14} />
+          <span>{scanStatus === "scanning" ? "Escaneando" : "Iniciar scan"}</span>
+          <span className="scan-duration">{scanStatus === "scanning" ? `${String(scanRemainingSeconds).padStart(2, "0")}s` : "20s"}</span>
         </button>
-        <button type="button" className="control-button" onClick={onStartScan} disabled={scanStatus === "scanning"}>
-          {scanStatus === "scanning" ? "Escaneando" : "Iniciar scan"}
-        </button>
+
+        <div className="scan-progress" aria-hidden="true">
+          <span style={{ width: `${scanProgress}%` }} />
+        </div>
+
+        {scanError ? <p className="inline-error">{scanError}</p> : null}
+
+        <label className="search-field">
+          <Search size={14} />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Buscar por nome ou IMEI"
+            aria-label="Buscar dispositivo"
+          />
+          {query ? (
+            <button type="button" onClick={() => setQuery("")} title="Limpar busca">
+              <X size={12} />
+            </button>
+          ) : null}
+        </label>
       </div>
 
-      {scanError ? <p className="inline-error">{scanError}</p> : null}
-
-      <label className="search-field">
-        <Search size={16} />
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Nome ou ID"
-          aria-label="Buscar dispositivo"
-        />
-      </label>
-
-      <div className="sort-hint">
-        <span>{filteredDevices.length} compativeis</span>
+      <div className="device-section-heading">
+        <h2>Dispositivos</h2>
+        <span>
+          {onlineDeviceCount}/{devices.length}
+        </span>
       </div>
 
       <div className="device-list">
+        {filteredDevices.length === 0 ? (
+          <div className="device-empty-state">
+            {scanStatus === "scanning" ? "Aguardando dispositivos..." : "Nenhum dispositivo encontrado."}
+          </div>
+        ) : null}
         {filteredDevices.map((device) => {
           const type = getDeviceType(device);
           const isOnline = isDeviceOnline(device.id);
+          const deviceKey = getBleDeviceIdentity(device);
 
           return (
             <article
               key={device.id}
-              className={`device-row ${selectedDeviceId === device.id ? "selected" : ""}`}
+              className={`device-row ${selectedDeviceKey === deviceKey ? "selected" : ""}`}
             >
               <button type="button" className="device-main" onClick={() => onSelectDevice(device)}>
                 <span className={`status-dot ${isOnline ? "online" : "offline"}`} />
-                <span>
-                  <strong>{getDeviceName(device)}</strong>
-                  <small>{device.id}</small>
-                </span>
+                <strong>{getDeviceName(device)}</strong>
+                <small>{type ? getKhompDeviceTypeLabel(type) : "Khomp"}</small>
+                <span className="device-short-id">{formatShortId(device.id)}</span>
               </button>
               <div className="device-meta">
-                <span>{type ? getKhompDeviceTypeLabel(type) : "Khomp"}</span>
-                <span>{isOnline ? `${device.rssi} dBm` : formatLastSeen(device.lastSeenAt)}</span>
+                {isOnline ? (
+                  <span className="device-rssi">
+                    <SignalBars level={getSignalBars(device.rssi)} />
+                    {device.rssi} dBm
+                  </span>
+                ) : (
+                  <span>offline · {formatLastSeen(device.lastSeenAt)}</span>
+                )}
               </div>
             </article>
           );

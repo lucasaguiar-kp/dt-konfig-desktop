@@ -14,7 +14,14 @@
       {
         "title": "DT Konfig",
         "width": 800,
-        "height": 600
+        "height": 600,
+        "minWidth": 1120,
+        "minHeight": 720,
+        "maximized": true,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 18, "y": 25 }
       }
     ],
     "security": {

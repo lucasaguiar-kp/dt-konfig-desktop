@@ -18,8 +18,7 @@ export function parseDeviceTerminalChunk(
   let configReady = false;
 
   if (passwordAccepted) {
-    nextStage = "config";
-    shouldSendConfig = !state.configRequested;
+    nextStage = "commands";
   }
 
   if (state.configRequested || shouldSendConfig) {

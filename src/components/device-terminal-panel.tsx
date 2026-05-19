@@ -1,5 +1,6 @@
-import { Copy, PlugZap, Send, Settings, Terminal, Unplug, X } from "lucide-react";
+import { Copy, PlugZap, Send, Settings, Terminal, Trash2, Unplug, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { getBleDeviceIdentity } from "../lib/ble/device-identity";
 import type { BleClient, BleDevice } from "../lib/ble/types";
 import { getKhompDeviceType, getKhompDeviceTypeLabel } from "../lib/constants";
 import { useDeviceTerminal } from "../hooks/use-device-terminal";
@@ -10,6 +11,7 @@ type DeviceTerminalPanelProps = {
   device: BleDevice | null;
   bleClient?: BleClient;
   stopScan?: () => Promise<void>;
+  resolveDeviceIdBeforeConnect?: () => Promise<string | null>;
   autoConnect?: boolean;
 };
 
@@ -25,29 +27,37 @@ function formatTimestamp(value: number): string {
   }).format(value);
 }
 
-export function DeviceTerminalPanel({ device, bleClient, stopScan, autoConnect = false }: DeviceTerminalPanelProps) {
+export function DeviceTerminalPanel({
+  device,
+  bleClient,
+  stopScan,
+  resolveDeviceIdBeforeConnect,
+  autoConnect = false,
+}: DeviceTerminalPanelProps) {
   const deviceType = device ? getKhompDeviceType(device.name ?? device.localName) : null;
+  const deviceAutoConnectKey = device ? getBleDeviceIdentity(device) : null;
   const [inputValue, setInputValue] = useState("");
   const [isCommandsOpen, setIsCommandsOpen] = useState(false);
   const lastAutoConnectDeviceIdRef = useRef<string | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const historyRef = useRef<HTMLDivElement | null>(null);
   const {
     status,
     error,
     history,
     stage,
-    configReady,
-    isBoxModel,
-    commandOptions,
     connect,
     disconnect,
     sendCommand,
     copyTerminal,
     copyEntry,
+    clearTerminal,
   } = useDeviceTerminal({
     client: bleClient,
     deviceId: device?.id ?? null,
     deviceType,
     stopScan,
+    resolveDeviceIdBeforeConnect,
   });
   const ensureDeviceCommands = useUserCommandsStore((state) => state.ensureDeviceCommands);
   const commandsByDevice = useUserCommandsStore((state) => state.deviceCommands);
@@ -60,18 +70,18 @@ export function DeviceTerminalPanel({ device, bleClient, stopScan, autoConnect =
   }, [device, ensureDeviceCommands]);
 
   useEffect(() => {
-    if (!device) {
+    if (!device || !deviceAutoConnectKey) {
       lastAutoConnectDeviceIdRef.current = null;
       return;
     }
 
-    if (!autoConnect || lastAutoConnectDeviceIdRef.current === device.id) {
+    if (!autoConnect || lastAutoConnectDeviceIdRef.current === deviceAutoConnectKey) {
       return;
     }
 
-    lastAutoConnectDeviceIdRef.current = device.id;
+    lastAutoConnectDeviceIdRef.current = deviceAutoConnectKey;
     void connect();
-  }, [autoConnect, connect, device]);
+  }, [autoConnect, connect, device, deviceAutoConnectKey]);
 
   const pinnedCommands = useMemo(() => {
     if (!device) {
@@ -82,13 +92,22 @@ export function DeviceTerminalPanel({ device, bleClient, stopScan, autoConnect =
     const pinnedIds = pinnedByDevice[device.id] ?? [];
     return commands.filter((command) => pinnedIds.includes(command.id));
   }, [commandsByDevice, device, pinnedByDevice]);
-  const visibleCommandOptions = useMemo(
-    () => commandOptions.filter((option) => option.command.trim().length > 0),
-    [commandOptions],
-  );
+
+  useEffect(() => {
+    const historyElement = historyRef.current;
+    if (!historyElement) {
+      return;
+    }
+
+    historyElement.scrollTop = historyElement.scrollHeight;
+  }, [history]);
 
   function insertCommand(command: string) {
     setInputValue(command);
+    window.requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(command.length, command.length);
+    });
   }
 
   async function sendInput(event?: FormEvent<HTMLFormElement>) {
@@ -116,17 +135,23 @@ export function DeviceTerminalPanel({ device, bleClient, stopScan, autoConnect =
   return (
     <section className="terminal-panel">
       <header className="terminal-header">
-        <div>
-          <p className="eyebrow">{deviceType ? getKhompDeviceTypeLabel(deviceType) : "Khomp"}</p>
-          <h2>{getDeviceName(device)}</h2>
-          <p className="device-id">{device.id}</p>
+        <div className="terminal-title">
+          <Terminal size={14} />
+          <span>Terminal</span>
+          <span className="terminal-divider">·</span>
+          <strong>{getDeviceName(device)}</strong>
+          <small>{deviceType ? getKhompDeviceTypeLabel(deviceType) : "Khomp"}</small>
         </div>
         <div className="terminal-actions">
           <span className={`connection-badge connection-${status}`}>{status}</span>
+          <button type="button" className="tiny-button" onClick={clearTerminal} title="Limpar terminal">
+            <Trash2 size={13} />
+            Limpar
+          </button>
           <button type="button" className="icon-button" onClick={copyTerminal} title="Copiar terminal">
             <Copy size={18} />
           </button>
-          <button type="button" className="control-button" onClick={() => setIsCommandsOpen(true)}>
+          <button type="button" className="tiny-button accent" onClick={() => setIsCommandsOpen(true)}>
             <Settings size={17} />
             Comandos
           </button>
@@ -143,26 +168,24 @@ export function DeviceTerminalPanel({ device, bleClient, stopScan, autoConnect =
         </div>
       </header>
 
-      <div className="terminal-state-row">
-        <span>Etapa: {stage}</span>
-        <span>{configReady ? "Config pronta" : "Aguardando config"}</span>
-        {isBoxModel ? <span>BOX</span> : null}
-      </div>
-
       {error ? <p className="inline-error">{error}</p> : null}
 
-      <div className="terminal-history" aria-label="Historico do terminal">
+      <div className="terminal-device-summary">
+        <span>{device.id}</span>
+      </div>
+
+      <div ref={historyRef} className="terminal-history" aria-label="Historico do terminal">
         {history.length ? (
           history.map((entry) => (
             <div className={`terminal-entry terminal-entry-${entry.direction}`} key={entry.id}>
               <div className="entry-meta">
-                <span>{entry.direction.toUpperCase()}</span>
                 <time>{formatTimestamp(entry.timestamp)}</time>
-                <button type="button" onClick={() => void copyEntry(entry)} title="Copiar entrada">
-                  <Copy size={14} />
-                </button>
+                <span>{entry.direction.toUpperCase()}</span>
               </div>
               <pre>{entry.text}</pre>
+              <button type="button" className="entry-copy" onClick={() => void copyEntry(entry)} title="Copiar entrada">
+                <Copy size={13} />
+              </button>
             </div>
           ))
         ) : (
@@ -170,12 +193,37 @@ export function DeviceTerminalPanel({ device, bleClient, stopScan, autoConnect =
         )}
       </div>
 
+      {pinnedCommands.length ? (
+        <div className="terminal-pinned-commands" aria-label="Comandos fixados no terminal">
+          <span>Fixados</span>
+          {pinnedCommands.map((command) => (
+            <button
+              type="button"
+              key={command.id}
+              onClick={() =>
+                command.requiresValue ? insertCommand(command.command) : void sendCommand(command.command)
+              }
+              disabled={status !== "connected"}
+              title={command.description ?? command.command}
+            >
+              {command.command}
+              {command.requiresValue ? <small>VAL</small> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       <form className="terminal-input-row" onSubmit={(event) => void sendInput(event)}>
+        <span className="input-prompt" aria-hidden="true">
+          ›
+        </span>
         <input
+          ref={inputRef}
           value={inputValue}
           onChange={(event) => setInputValue(event.target.value)}
-          placeholder={stage === "password" ? "Senha do dispositivo" : "AT+COMANDO"}
+          placeholder={stage === "password" ? "Digite a senha do dispositivo" : "Digite um comando AT"}
           aria-label="Entrada do terminal"
+          spellCheck={false}
         />
         <button type="submit" className="control-button primary" disabled={status !== "connected"}>
           <Send size={17} />
@@ -200,42 +248,6 @@ export function DeviceTerminalPanel({ device, bleClient, stopScan, autoConnect =
               <button type="button" className="icon-button" onClick={() => setIsCommandsOpen(false)} title="Fechar">
                 <X size={18} />
               </button>
-            </div>
-
-            <div className="terminal-command-strip">
-              <div className="quick-command-bar" aria-label="Comandos fixados">
-                {pinnedCommands.length ? (
-                  pinnedCommands.map((command) => (
-                    <button
-                      type="button"
-                      key={command.id}
-                      onClick={() =>
-                        command.requiresValue ? insertCommand(command.command) : void sendCommand(command.command)
-                      }
-                    >
-                      {command.command}
-                    </button>
-                  ))
-                ) : (
-                  <span>Nenhum comando fixado</span>
-                )}
-              </div>
-
-              {visibleCommandOptions.length ? (
-                <div className="quick-command-bar secondary" aria-label="Comandos da etapa">
-                  {visibleCommandOptions.map((option) => (
-                    <button
-                      type="button"
-                      key={`${option.command}-${option.label}`}
-                      onClick={() =>
-                        option.requiresValue ? insertCommand(option.command) : void sendCommand(option.command)
-                      }
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
             </div>
 
             <CommandManager

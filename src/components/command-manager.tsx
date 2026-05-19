@@ -1,4 +1,4 @@
-import { Check, Pencil, Pin, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { Check, Pencil, Pin, Plus, Trash2, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { UserCommand } from "../lib/user-commands";
 import { useUserCommandsStore } from "../stores/user-commands-store";
@@ -29,7 +29,6 @@ export function CommandManager({ deviceId, onInsertCommand, onSendCommand }: Com
   const updateCommand = useUserCommandsStore((state) => state.updateCommand);
   const removeCommand = useUserCommandsStore((state) => state.removeCommand);
   const togglePinCommand = useUserCommandsStore((state) => state.togglePinCommand);
-  const resetToDefaults = useUserCommandsStore((state) => state.resetToDefaults);
   const [form, setForm] = useState<CommandFormState>(EMPTY_FORM);
   const [editingCommandId, setEditingCommandId] = useState<string | null>(null);
 
@@ -92,16 +91,6 @@ export function CommandManager({ deviceId, onInsertCommand, onSendCommand }: Com
 
   return (
     <section className="command-manager">
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">Por dispositivo</p>
-          <h3>Comandos</h3>
-        </div>
-        <button type="button" className="icon-button" onClick={() => resetToDefaults(deviceId)} title="Restaurar padrao">
-          <RotateCcw size={17} />
-        </button>
-      </div>
-
       <form className="command-form" onSubmit={submitCommand}>
         <input
           value={form.command}
@@ -115,14 +104,16 @@ export function CommandManager({ deviceId, onInsertCommand, onSendCommand }: Com
           placeholder="Descricao"
           aria-label="Descricao do comando"
         />
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={form.requiresValue}
-            onChange={(event) => setForm((value) => ({ ...value, requiresValue: event.target.checked }))}
-          />
+        <button
+          type="button"
+          className={`value-toggle ${form.requiresValue ? "active" : ""}`}
+          role="switch"
+          aria-checked={form.requiresValue}
+          onClick={() => setForm((value) => ({ ...value, requiresValue: !value.requiresValue }))}
+        >
+          <span aria-hidden="true" />
           Valor
-        </label>
+        </button>
         <button type="submit" className="icon-button primary" title={editingCommandId ? "Salvar" : "Criar"}>
           {editingCommandId ? <Check size={17} /> : <Plus size={17} />}
         </button>
@@ -174,4 +165,3 @@ export function CommandManager({ deviceId, onInsertCommand, onSendCommand }: Com
     </section>
   );
 }
-

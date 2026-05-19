@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "sh scripts/dev-vite.sh",
+    "dev:macos": "sh scripts/dev-macos.sh",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",

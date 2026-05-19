@@ -3,7 +3,7 @@ import { parseDeviceTerminalChunk } from "./parser";
 import type { DeviceTerminalEvent } from "./types";
 
 describe("parseDeviceTerminalChunk", () => {
-  it("accepts password and requests config", () => {
+  it("accepts password without requesting config automatically", () => {
     const state: DeviceTerminalEvent = {
       deviceType: "DTN_NB",
       stage: "password",
@@ -12,9 +12,9 @@ describe("parseDeviceTerminalChunk", () => {
     };
 
     expect(parseDeviceTerminalChunk("PASSWORD CORRECT", state)).toMatchObject({
-      nextStage: "config",
+      nextStage: "commands",
       passwordAccepted: true,
-      shouldSendConfig: true,
+      shouldSendConfig: false,
     });
   });
 

@@ -17,6 +17,7 @@ type UseDeviceTerminalOptions = {
   deviceId: string | null;
   deviceType: KhompDeviceType | null;
   stopScan?: () => Promise<void>;
+  resolveDeviceIdBeforeConnect?: () => Promise<string | null>;
 };
 
 export type TerminalConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
@@ -58,6 +59,7 @@ export function useDeviceTerminal({
   deviceId,
   deviceType,
   stopScan,
+  resolveDeviceIdBeforeConnect,
 }: UseDeviceTerminalOptions) {
   const [status, setStatus] = useState<TerminalConnectionStatus>("disconnected");
   const [error, setError] = useState<string | null>(null);
@@ -135,7 +137,7 @@ export function useDeviceTerminal({
 
   const disconnect = useCallback(async () => {
     const disconnectGeneration = ++connectionGenerationRef.current;
-    const currentDeviceId = deviceId;
+    const currentDeviceId = ownedDeviceRef.current?.deviceId ?? deviceId;
     const currentCharacteristic = terminalCharacteristicRef.current;
     const unsubscribe = notificationUnsubscribeRef.current;
     notificationUnsubscribeRef.current = null;
@@ -223,7 +225,10 @@ export function useDeviceTerminal({
       return;
     }
 
-    await disconnect();
+    if (!ownedDeviceRef.current || ownedDeviceRef.current.deviceId === deviceId) {
+      await disconnect();
+    }
+
     const attemptId = ++connectionGenerationRef.current;
     const isCurrentAttempt = () => isMountedRef.current && connectionGenerationRef.current === attemptId;
 
@@ -231,7 +236,13 @@ export function useDeviceTerminal({
       return;
     }
 
-    ownedDeviceRef.current = { deviceId, generation: attemptId };
+    const connectionDeviceId = (await resolveDeviceIdBeforeConnect?.()) ?? deviceId;
+
+    if (!connectionDeviceId || !isCurrentAttempt()) {
+      return;
+    }
+
+    ownedDeviceRef.current = { deviceId: connectionDeviceId, generation: attemptId };
     setStatus("connecting");
     setError(null);
     setHistory([]);
@@ -248,19 +259,19 @@ export function useDeviceTerminal({
     try {
       await stopScan?.();
       if (!isCurrentAttempt()) {
-        await cleanupConnection(deviceId, null, null, { generation: attemptId, clearCurrentState: false });
+        await cleanupConnection(connectionDeviceId, null, null, { generation: attemptId, clearCurrentState: false });
         return;
       }
 
-      await client.connect(deviceId);
+      await client.connect(connectionDeviceId);
       if (!isCurrentAttempt()) {
-        await cleanupConnection(deviceId, null, null, { generation: attemptId, clearCurrentState: false });
+        await cleanupConnection(connectionDeviceId, null, null, { generation: attemptId, clearCurrentState: false });
         return;
       }
 
-      const characteristics = await client.services(deviceId);
+      const characteristics = await client.services(connectionDeviceId);
       if (!isCurrentAttempt()) {
-        await cleanupConnection(deviceId, null, null, { generation: attemptId, clearCurrentState: false });
+        await cleanupConnection(connectionDeviceId, null, null, { generation: attemptId, clearCurrentState: false });
         return;
       }
 
@@ -276,7 +287,7 @@ export function useDeviceTerminal({
           return;
         }
 
-        if (String(notification.deviceId) !== String(deviceId)) {
+        if (String(notification.deviceId) !== String(connectionDeviceId)) {
           return;
         }
 
@@ -296,13 +307,17 @@ export function useDeviceTerminal({
       if (!isCurrentAttempt()) {
         unsubscribe();
         attemptedUnsubscribe = null;
-        await cleanupConnection(deviceId, null, null, { generation: attemptId, clearCurrentState: false });
+        await cleanupConnection(connectionDeviceId, null, null, { generation: attemptId, clearCurrentState: false });
         return;
       }
 
-      await client.startNotify(deviceId, terminalCharacteristic.serviceUuid, terminalCharacteristic.notifyCharUuid);
+      await client.startNotify(
+        connectionDeviceId,
+        terminalCharacteristic.serviceUuid,
+        terminalCharacteristic.notifyCharUuid,
+      );
       if (!isCurrentAttempt()) {
-        await cleanupConnection(deviceId, terminalCharacteristic, unsubscribe, {
+        await cleanupConnection(connectionDeviceId, terminalCharacteristic, unsubscribe, {
           generation: attemptId,
           clearCurrentState: false,
         });
@@ -323,7 +338,7 @@ export function useDeviceTerminal({
       }
 
       const message = getErrorMessage(connectError);
-      await cleanupConnection(deviceId, attemptedCharacteristic, attemptedUnsubscribe, {
+      await cleanupConnection(connectionDeviceId, attemptedCharacteristic, attemptedUnsubscribe, {
         generation: attemptId,
         clearCurrentState: true,
       });
@@ -337,11 +352,22 @@ export function useDeviceTerminal({
         setStatus("error");
       }
     }
-  }, [appendHistory, cleanupConnection, client, deviceId, disconnect, handleAscii, stopScan]);
+  }, [
+    appendHistory,
+    cleanupConnection,
+    client,
+    deviceId,
+    disconnect,
+    handleAscii,
+    resolveDeviceIdBeforeConnect,
+    stopScan,
+  ]);
 
   const sendCommand = useCallback(
     async (command: string, value = "") => {
-      if (!deviceId || !terminalCharacteristicRef.current) {
+      const targetDeviceId = ownedDeviceRef.current?.deviceId ?? deviceId;
+
+      if (!targetDeviceId || !terminalCharacteristicRef.current) {
         setError("Conecte ao dispositivo antes de enviar comandos.");
         return;
       }
@@ -357,7 +383,7 @@ export function useDeviceTerminal({
 
       try {
         await client.write(
-          deviceId,
+          targetDeviceId,
           characteristic.serviceUuid,
           characteristic.writeCharUuid,
           bytes,
@@ -366,7 +392,7 @@ export function useDeviceTerminal({
       } catch (writeError) {
         try {
           await client.writeWithoutResponse(
-            deviceId,
+            targetDeviceId,
             characteristic.serviceUuid,
             characteristic.writeCharUuid,
             bytes,
@@ -389,6 +415,10 @@ export function useDeviceTerminal({
 
   const copyEntry = useCallback(async (entry: TerminalHistoryEntry) => {
     await navigator.clipboard?.writeText(entry.text);
+  }, []);
+
+  const clearTerminal = useCallback(() => {
+    setHistory([]);
   }, []);
 
   useEffect(() => {
@@ -419,5 +449,6 @@ export function useDeviceTerminal({
     sendCommand,
     copyTerminal,
     copyEntry,
+    clearTerminal,
   };
 }

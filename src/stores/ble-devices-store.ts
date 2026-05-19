@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, devtools, persist } from "zustand/middleware";
+import { getBleDeviceIdentity } from "../lib/ble/device-identity";
 import type { BleDevice } from "../lib/ble/types";
 import { storage } from "../storage";
 
@@ -42,6 +43,10 @@ function isFresh(deviceData: DeviceWithTimestamp, now: number): boolean {
   return now - deviceData.lastSeen <= STALE_TIMEOUT;
 }
 
+function findDeviceDataById(devices: Map<string, DeviceWithTimestamp>, deviceId: string): DeviceWithTimestamp | null {
+  return devices.get(deviceId) ?? Array.from(devices.values()).find(({ device }) => device.id === deviceId) ?? null;
+}
+
 export const useBleDevicesStore = create<BleDevicesStore>()(
   devtools(
     persist(
@@ -52,18 +57,23 @@ export const useBleDevicesStore = create<BleDevicesStore>()(
 
         addOrUpdateDevice: (device) => {
           const now = Date.now();
+          const deviceKey = getBleDeviceIdentity(device);
           const currentDevice = withSeenTimestamp(device, now);
-          const existingDevice = get().devices.get(device.id);
+          const existingDevice = get().devices.get(deviceKey);
 
-          if (existingDevice && now - existingDevice.lastUpdate < UPDATE_THROTTLE) {
+          if (
+            existingDevice &&
+            existingDevice.device.id === device.id &&
+            now - existingDevice.lastUpdate < UPDATE_THROTTLE
+          ) {
             existingDevice.lastSeen = now;
             existingDevice.device = currentDevice;
 
-            if (get().pinnedDeviceIds.includes(device.id)) {
+            if (get().pinnedDeviceIds.includes(deviceKey)) {
               set((state) => ({
                 pinnedDeviceSnapshots: {
                   ...state.pinnedDeviceSnapshots,
-                  [device.id]: currentDevice,
+                  [deviceKey]: currentDevice,
                 },
               }));
             }
@@ -73,13 +83,13 @@ export const useBleDevicesStore = create<BleDevicesStore>()(
 
           set((state) => {
             const devices = new Map(state.devices);
-            devices.set(device.id, {
+            devices.set(deviceKey, {
               device: currentDevice,
               lastSeen: now,
               lastUpdate: now,
             });
 
-            if (!state.pinnedDeviceIds.includes(device.id)) {
+            if (!state.pinnedDeviceIds.includes(deviceKey)) {
               return { devices };
             }
 
@@ -87,7 +97,7 @@ export const useBleDevicesStore = create<BleDevicesStore>()(
               devices,
               pinnedDeviceSnapshots: {
                 ...state.pinnedDeviceSnapshots,
-                [device.id]: currentDevice,
+                [deviceKey]: currentDevice,
               },
             };
           });
@@ -124,7 +134,7 @@ export const useBleDevicesStore = create<BleDevicesStore>()(
         },
 
         isDeviceOnline: (deviceId) => {
-          const deviceData = get().devices.get(deviceId);
+          const deviceData = findDeviceDataById(get().devices, deviceId);
           return deviceData ? isFresh(deviceData, Date.now()) : false;
         },
 
