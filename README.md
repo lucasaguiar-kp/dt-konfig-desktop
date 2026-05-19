@@ -1,3 +1,4 @@
+<img width="1800" height="1169" alt="Screenshot 2026-05-18 at 20 13 54" src="https://github.com/user-attachments/assets/a23fa481-b660-4d2b-8b83-0b6e65433435" />
 # DT Konfig Desktop
 
 Desktop Tauri version of DT Konfig for BLE device configuration and DTN NB OTA updates.
