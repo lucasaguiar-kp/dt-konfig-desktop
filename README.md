@@ -79,14 +79,14 @@ src-tauri/target/release/bundle/dmg/DT Konfig_0.1.0_aarch64.dmg
 
 This repository includes a release workflow at `.github/workflows/release.yml`.
 
-To generate draft releases with macOS, Windows, and Linux bundles:
+To generate a GitHub Release with macOS, Windows, and Linux bundles:
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The workflow creates a draft GitHub Release and attaches the generated installers.
+The workflow creates the GitHub Release, attaches the generated installers, and also stores the bundles as workflow artifacts.
 
 ## Linux BLE Requirements
 

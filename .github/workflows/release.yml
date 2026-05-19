@@ -1,5 +1,5 @@
 # Native Tauri release builds. Push a tag like `v0.1.0` or run this workflow
-# manually to create a draft GitHub Release with desktop installers.
+# manually to create a GitHub Release with desktop installers.
 #
 # Supported targets:
 # - macOS Apple Silicon: .dmg + .app archive
@@ -81,7 +81,20 @@ jobs:
             - macOS Apple Silicon
             - Windows x64
             - Linux x64
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           tauriScript: bun tauri
           args: ${{ matrix.args }}
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dt-konfig-${{ matrix.platform }}
+          if-no-files-found: warn
+          path: |
+            src-tauri/target/**/release/bundle/**/*.dmg
+            src-tauri/target/**/release/bundle/**/*.msi
+            src-tauri/target/**/release/bundle/**/*.exe
+            src-tauri/target/**/release/bundle/**/*.AppImage
+            src-tauri/target/**/release/bundle/**/*.deb
+            src-tauri/target/**/release/bundle/**/*.rpm
