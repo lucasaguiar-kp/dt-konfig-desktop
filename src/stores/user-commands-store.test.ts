@@ -32,15 +32,43 @@ describe("useUserCommandsStore", () => {
   });
 
   it("seeds default commands for a device", () => {
-    useUserCommandsStore.getState().ensureDeviceCommands("device-1");
+    useUserCommandsStore.getState().ensureDeviceCommands("device-1", "DTN_NB");
 
     const commands = useUserCommandsStore.getState().getDeviceCommands("device-1");
 
-    expect(commands.map((command) => command.command)).toEqual(
-      expect.arrayContaining(["AT+CFG", "ATZ"]),
-    );
+    expect(commands.map((command) => command.command)).toEqual([
+      "AT+CFG",
+      "AT+GETSENSORVALUE=1",
+      "AT+GETSENSORVALUE=0",
+      "AT+QBAND=",
+      "AT+SERVADDR=",
+      "AT+CLIENT=",
+      "AT+UNAME=",
+      "AT+PWD=",
+      "AT+PUBTOPIC=",
+      "AT+SUBTOPIC=",
+      "AT+TDC=",
+      "AT+APN=",
+      "AT+PRO=",
+    ]);
     expect(commands.find((command) => command.command === "AT+TDC=")?.requiresValue).toBe(true);
-    expect(commands.find((command) => command.command === "AT+QCGDEFCONT=IPV4V6,")?.requiresValue).toBe(true);
+    expect(commands.find((command) => command.command === "AT+GETSENSORVALUE=1")?.requiresValue).toBe(false);
+    expect(commands.find((command) => command.command === "AT+QBAND=")?.requiresValue).toBe(true);
+    expect(commands.find((command) => command.command === "ATZ")).toBeUndefined();
+  });
+
+  it("seeds LoRa defaults for LoRa devices", () => {
+    useUserCommandsStore.getState().ensureDeviceCommands("device-1", "DTL_LORA");
+
+    const commands = useUserCommandsStore.getState().getDeviceCommands("device-1");
+
+    expect(commands.map((command) => command.command)).toEqual([
+      "AT+CFG",
+      "AT+GETSENSORVALUE=1",
+      "AT+GETSENSORVALUE=0",
+      "AT+TDC=",
+      "ATZ",
+    ]);
     expect(commands.find((command) => command.command === "ATZ")?.requiresValue).toBe(false);
   });
 
@@ -93,18 +121,45 @@ describe("useUserCommandsStore", () => {
   });
 
   it("resets one device to defaults without changing another device", () => {
-    useUserCommandsStore.getState().ensureDeviceCommands("device-1");
-    useUserCommandsStore.getState().ensureDeviceCommands("device-2");
+    useUserCommandsStore.getState().ensureDeviceCommands("device-1", "DTN_NB");
+    useUserCommandsStore.getState().ensureDeviceCommands("device-2", "DTL_LORA");
     useUserCommandsStore.getState().addCommand("device-1", {
       command: "AT+CUSTOM",
       requiresValue: false,
     });
     const device2Commands = useUserCommandsStore.getState().getDeviceCommands("device-2");
 
-    useUserCommandsStore.getState().resetToDefaults("device-1");
+    useUserCommandsStore.getState().resetToDefaults("device-1", "DTN_NB");
 
-    expect(useUserCommandsStore.getState().getDeviceCommands("device-1")).toEqual(createDefaultUserCommands());
+    expect(useUserCommandsStore.getState().getDeviceCommands("device-1")).toEqual(createDefaultUserCommands("DTN_NB"));
     expect(useUserCommandsStore.getState().getDeviceCommands("device-2")).toEqual(device2Commands);
+  });
+
+  it("updates old default commands while preserving custom commands", () => {
+    useUserCommandsStore.setState({
+      deviceCommands: {
+        "device-1": [
+          {
+            id: "custom-command",
+            command: "AT+CUSTOM",
+            requiresValue: false,
+          },
+          {
+            id: "default:AT+QCGDEFCONT=IPV4V6,",
+            command: "AT+QCGDEFCONT=IPV4V6,",
+            requiresValue: true,
+          },
+        ],
+      },
+      initializedDeviceIds: ["device-1"],
+    });
+
+    useUserCommandsStore.getState().ensureDeviceCommands("device-1", "DTN_NB");
+
+    expect(useUserCommandsStore.getState().getDeviceCommands("device-1").map((command) => command.command)).toEqual([
+      "AT+CUSTOM",
+      ...createDefaultUserCommands("DTN_NB").map((command) => command.command),
+    ]);
   });
 
   it("persists command data, pinned command ids, and initialized device ids only", async () => {

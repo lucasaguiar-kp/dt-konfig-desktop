@@ -1,10 +1,12 @@
 import { Check, Pencil, Pin, Plus, Trash2, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import type { KhompDeviceType } from "../lib/constants";
 import type { UserCommand } from "../lib/user-commands";
 import { useUserCommandsStore } from "../stores/user-commands-store";
 
 type CommandManagerProps = {
   deviceId: string | null;
+  deviceType?: KhompDeviceType | null;
   onInsertCommand: (command: string) => void;
   onSendCommand: (command: string) => void;
 };
@@ -21,7 +23,7 @@ const EMPTY_FORM: CommandFormState = {
   requiresValue: false,
 };
 
-export function CommandManager({ deviceId, onInsertCommand, onSendCommand }: CommandManagerProps) {
+export function CommandManager({ deviceId, deviceType, onInsertCommand, onSendCommand }: CommandManagerProps) {
   const ensureDeviceCommands = useUserCommandsStore((state) => state.ensureDeviceCommands);
   const commandsByDevice = useUserCommandsStore((state) => state.deviceCommands);
   const pinnedByDevice = useUserCommandsStore((state) => state.devicePinnedCommandIds);
@@ -34,9 +36,9 @@ export function CommandManager({ deviceId, onInsertCommand, onSendCommand }: Com
 
   useEffect(() => {
     if (deviceId) {
-      ensureDeviceCommands(deviceId);
+      ensureDeviceCommands(deviceId, deviceType);
     }
-  }, [deviceId, ensureDeviceCommands]);
+  }, [deviceId, deviceType, ensureDeviceCommands]);
 
   const commands = useMemo(() => (deviceId ? commandsByDevice[deviceId] ?? [] : []), [commandsByDevice, deviceId]);
   const pinnedCommandIds = useMemo(

@@ -96,6 +96,10 @@ class TerminalTestClient implements BleClient {
   }
 }
 
+function textToBytes(value: string): number[] {
+  return Array.from(value, (character) => character.charCodeAt(0));
+}
+
 const TERMINAL_CHARACTERISTICS: BleCharacteristic[] = [
   {
     serviceUuid: "0000ffe0-0000-1000-8000-00805f9b34fb",
@@ -368,5 +372,94 @@ describe("useDeviceTerminal", () => {
     });
 
     expect(result.current.status).toBe("connected");
+  });
+
+  it("keeps the terminal log and asks for the password again when the password expires", async () => {
+    const client = new TerminalTestClient();
+    client.servicesByDevice.set("device-a", TERMINAL_CHARACTERISTICS);
+    const { result } = renderHook(() =>
+      useDeviceTerminal({
+        client,
+        deviceId: "device-a",
+        deviceType: "DTN_NB",
+      }),
+    );
+
+    await act(async () => {
+      await result.current.connect();
+      await result.current.sendCommand("378d0c");
+    });
+
+    const disconnectCallsAfterConnect = client.disconnectCalls.length;
+    vi.useFakeTimers();
+
+    act(() => {
+      client.emitNotification({
+        deviceId: "device-a",
+        serviceUuid: "ffe0",
+        characteristicUuid: "ffe1",
+        value: textToBytes("PASSWORD TIMEOUT"),
+      });
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(400);
+    });
+
+    const logText = result.current.history.map((entry) => entry.text);
+    expect(result.current.status).toBe("connected");
+    expect(result.current.stage).toBe("password");
+    expect(client.disconnectCalls).toHaveLength(disconnectCallsAfterConnect);
+    expect(logText).toContain("Conectado ao terminal BLE.");
+    expect(logText).toContain("378d0c");
+    expect(logText).toContain("PASSWORD TIMEOUT");
+    expect(logText).toContain("Tempo para senha expirado.");
+  });
+
+  it("keeps the terminal log across failed and successful reconnect attempts", async () => {
+    const client = new TerminalTestClient();
+    let resolvedDeviceId = "device-a";
+    client.servicesByDevice.set("device-a", TERMINAL_CHARACTERISTICS);
+    const { result } = renderHook(() =>
+      useDeviceTerminal({
+        client,
+        deviceId: "device-a",
+        deviceType: "DTN_NB",
+        resolveDeviceIdBeforeConnect: async () => resolvedDeviceId,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.connect();
+      await result.current.sendCommand("AT+CFG");
+    });
+
+    resolvedDeviceId = "device-offline";
+    client.servicesByDevice.set("device-offline", Promise.reject(new Error("BLE device not found: device-offline")));
+
+    await act(async () => {
+      await result.current.connect();
+    });
+
+    expect(result.current.status).toBe("error");
+    expect(result.current.history.map((entry) => entry.text)).toEqual(
+      expect.arrayContaining(["Conectado ao terminal BLE.", "AT+CFG", "BLE device not found: device-offline"]),
+    );
+
+    client.servicesByDevice.set("device-offline", TERMINAL_CHARACTERISTICS);
+
+    await act(async () => {
+      await result.current.connect();
+    });
+
+    expect(result.current.status).toBe("connected");
+    expect(result.current.history.map((entry) => entry.text)).toEqual(
+      expect.arrayContaining([
+        "Conectado ao terminal BLE.",
+        "AT+CFG",
+        "BLE device not found: device-offline",
+      ]),
+    );
+    expect(result.current.history.filter((entry) => entry.text === "Conectado ao terminal BLE.")).toHaveLength(2);
   });
 });

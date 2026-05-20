@@ -118,4 +118,65 @@ describe("DeviceTerminalPanel", () => {
 
     expect(valueToggle).toHaveAttribute("aria-checked", "true");
   });
+
+  it("recalls sent commands with arrow up and down in the terminal input", async () => {
+    const client = new PanelTestClient();
+
+    render(<DeviceTerminalPanel device={device} bleClient={client} autoConnect />);
+
+    await waitFor(() => expect(client.connectCalls).toEqual(["device-1"]));
+
+    const input = screen.getByLabelText("Entrada do terminal");
+    const sendButton = screen.getByRole("button", { name: "Enviar" });
+
+    fireEvent.change(input, { target: { value: "AT+CFG" } });
+    fireEvent.click(sendButton);
+    await waitFor(() => expect(input).toHaveValue(""));
+
+    fireEvent.change(input, { target: { value: "AT+TDC=7200" } });
+    fireEvent.click(sendButton);
+    await waitFor(() => expect(input).toHaveValue(""));
+
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    expect(input).toHaveValue("AT+TDC=7200");
+
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    expect(input).toHaveValue("AT+CFG");
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(input).toHaveValue("AT+TDC=7200");
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(input).toHaveValue("");
+  });
+
+  it("opens sent command history from the input prompt button", async () => {
+    const client = new PanelTestClient();
+
+    render(<DeviceTerminalPanel device={device} bleClient={client} autoConnect />);
+
+    await waitFor(() => expect(client.connectCalls).toEqual(["device-1"]));
+
+    const input = screen.getByLabelText("Entrada do terminal");
+    const sendButton = screen.getByRole("button", { name: "Enviar" });
+
+    fireEvent.change(input, { target: { value: "AT+CFG" } });
+    fireEvent.click(sendButton);
+    await waitFor(() => expect(input).toHaveValue(""));
+
+    fireEvent.change(input, { target: { value: "AT+TDC=7200" } });
+    fireEvent.click(sendButton);
+    await waitFor(() => expect(input).toHaveValue(""));
+
+    fireEvent.click(screen.getByRole("button", { name: "Historico de comandos enviados" }));
+
+    const historyMenu = screen.getByRole("listbox", { name: "Historico de comandos enviados" });
+    expect(historyMenu).toHaveTextContent("AT+TDC=7200");
+    expect(historyMenu).toHaveTextContent("AT+CFG");
+
+    fireEvent.click(screen.getByRole("option", { name: "AT+CFG" }));
+
+    expect(input).toHaveValue("AT+CFG");
+    expect(screen.queryByRole("listbox", { name: "Historico de comandos enviados" })).not.toBeInTheDocument();
+  });
 });

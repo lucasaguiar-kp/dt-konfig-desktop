@@ -780,6 +780,7 @@ button:disabled {
   }
 
   .terminal-input-row {
+    position: relative;
     height: 44px;
     flex: 0 0 auto;
     padding: 0 10px;
@@ -792,11 +793,66 @@ button:disabled {
   }
 
   .input-prompt {
+    width: 22px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    display: inline-grid;
+    place-items: center;
+    background: transparent;
     color: var(--acc);
     font-family: var(--font-mono);
     font-size: 16px;
     font-weight: 700;
     text-align: center;
+  }
+
+  .input-prompt:not(:disabled):hover,
+  .input-prompt[aria-expanded="true"] {
+    border-color: color-mix(in srgb, var(--acc) 36%, transparent);
+    background: color-mix(in srgb, var(--acc) 12%, transparent);
+  }
+
+  .input-prompt:disabled {
+    cursor: default;
+    opacity: 0.56;
+  }
+
+  .command-history-menu {
+    position: absolute;
+    left: 10px;
+    right: 84px;
+    bottom: calc(100% + 8px);
+    z-index: 20;
+    max-height: 220px;
+    padding: 6px;
+    border: 1px solid var(--line-2);
+    border-radius: 6px;
+    display: grid;
+    gap: 4px;
+    overflow: auto;
+    background: color-mix(in srgb, var(--bg-2) 96%, black);
+    box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.34);
+  }
+
+  .command-history-menu button {
+    min-height: 30px;
+    padding: 0 10px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--fg-0);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    text-align: left;
+  }
+
+  .command-history-menu button:hover,
+  .command-history-menu button[aria-selected="true"] {
+    border-color: color-mix(in srgb, var(--acc) 28%, transparent);
+    background: color-mix(in srgb, var(--acc) 12%, transparent);
   }
 
   .terminal-input-row input {

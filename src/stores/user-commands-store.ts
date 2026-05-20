@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, devtools, persist } from "zustand/middleware";
+import type { KhompDeviceType } from "../lib/constants";
 import { createDefaultUserCommands, type UserCommand } from "../lib/user-commands";
 import { storage } from "../storage";
 
@@ -9,7 +10,7 @@ type UserCommandsStore = {
   initializedDeviceIds: string[];
   hasHydrated: boolean;
   setHasHydrated: (hydrated: boolean) => void;
-  ensureDeviceCommands: (deviceId: string) => void;
+  ensureDeviceCommands: (deviceId: string, deviceType?: KhompDeviceType | null) => void;
   getDeviceCommands: (deviceId: string) => UserCommand[];
   getPinnedCommands: (deviceId: string) => UserCommand[];
   isPinnedCommand: (deviceId: string, commandId: string) => boolean;
@@ -17,7 +18,7 @@ type UserCommandsStore = {
   addCommand: (deviceId: string, command: Omit<UserCommand, "id">) => void;
   updateCommand: (deviceId: string, command: UserCommand) => void;
   removeCommand: (deviceId: string, commandId: string) => void;
-  resetToDefaults: (deviceId: string) => void;
+  resetToDefaults: (deviceId: string, deviceType?: KhompDeviceType | null) => void;
 };
 
 function sanitizeCommands(value: unknown): UserCommand[] {
@@ -73,6 +74,27 @@ function sanitizePinnedCommandIds(value: unknown): Record<string, string[]> {
   );
 }
 
+function isDefaultCommand(command: UserCommand): boolean {
+  return command.id.startsWith("default:");
+}
+
+function mergeCommandsWithDefaults(currentCommands: UserCommand[], defaultCommands: UserCommand[]): UserCommand[] {
+  if (!currentCommands.length) {
+    return defaultCommands;
+  }
+
+  const customCommands = currentCommands.filter((command) => !isDefaultCommand(command));
+  const currentDefaultCommands = currentCommands.filter(isDefaultCommand);
+  const currentDefaultIds = currentDefaultCommands.map((command) => command.id).join("|");
+  const nextDefaultIds = defaultCommands.map((command) => command.id).join("|");
+
+  if (currentDefaultCommands.length > 0 && currentDefaultIds === nextDefaultIds) {
+    return currentCommands;
+  }
+
+  return [...customCommands, ...defaultCommands];
+}
+
 export const useUserCommandsStore = create<UserCommandsStore>()(
   devtools(
     persist(
@@ -84,10 +106,8 @@ export const useUserCommandsStore = create<UserCommandsStore>()(
 
         setHasHydrated: (hydrated) => set({ hasHydrated: hydrated }),
 
-        ensureDeviceCommands: (deviceId) => {
-          if (get().initializedDeviceIds.includes(deviceId) && get().deviceCommands[deviceId]?.length) {
-            return;
-          }
+        ensureDeviceCommands: (deviceId, deviceType) => {
+          const defaultCommands = createDefaultUserCommands(deviceType);
 
           set((state) => ({
             initializedDeviceIds: state.initializedDeviceIds.includes(deviceId)
@@ -95,7 +115,7 @@ export const useUserCommandsStore = create<UserCommandsStore>()(
               : [...state.initializedDeviceIds, deviceId],
             deviceCommands: {
               ...state.deviceCommands,
-              [deviceId]: createDefaultUserCommands(),
+              [deviceId]: mergeCommandsWithDefaults(state.deviceCommands[deviceId] ?? [], defaultCommands),
             },
           }));
         },
@@ -173,11 +193,11 @@ export const useUserCommandsStore = create<UserCommandsStore>()(
           }));
         },
 
-        resetToDefaults: (deviceId) => {
+        resetToDefaults: (deviceId, deviceType) => {
           set((state) => ({
             deviceCommands: {
               ...state.deviceCommands,
-              [deviceId]: createDefaultUserCommands(),
+              [deviceId]: createDefaultUserCommands(deviceType),
             },
             devicePinnedCommandIds: {
               ...state.devicePinnedCommandIds,

@@ -199,11 +199,14 @@ export function useDeviceTerminal({
       const message = parseResult.passwordRejected
         ? "Senha rejeitada pelo dispositivo."
         : "Tempo para senha expirado.";
+      stageRef.current = "password";
+      configRequestedRef.current = false;
+      setStage("password");
+      setConfigReady(false);
       setError(message);
       appendHistory("system", message);
-      void disconnect();
     }
-  }, [appendHistory, clearFlushTimer, deviceType, disconnect]);
+  }, [appendHistory, clearFlushTimer, deviceType]);
 
   const handleAscii = useCallback(
     (ascii: string) => {
@@ -245,7 +248,6 @@ export function useDeviceTerminal({
     ownedDeviceRef.current = { deviceId: connectionDeviceId, generation: attemptId };
     setStatus("connecting");
     setError(null);
-    setHistory([]);
     setStage("password");
     setConfigReady(false);
     setIsBoxModel(false);
@@ -378,6 +380,7 @@ export function useDeviceTerminal({
       }
 
       const displayCommand = normalizeTerminalText(`${command}${value}`);
+      setError(null);
       appendHistory("tx", displayCommand);
       const characteristic = terminalCharacteristicRef.current;
 

@@ -1,3 +1,5 @@
+import type { KhompDeviceType } from "./constants";
+
 export type UserCommand = {
   id: string;
   command: string;
@@ -11,45 +13,61 @@ type DefaultCommandDefinition = {
   requiresValue?: boolean;
 };
 
-export const DEFAULT_USER_COMMANDS: DefaultCommandDefinition[] = [
-  { command: "AT+CFG", description: "Printa as configurações do dispositivo" },
-  { command: "AT+TDC=", description: "Altera o intervalo de uplink" },
-  { command: "AT+APN=", description: "Configura a APN do Chip" },
-  {
-    command: "AT+QCGDEFCONT=IPV4V6,",
-    description: "Configura o protocolo IP",
-    requiresValue: true,
-  },
+export const DEFAULT_LORA_USER_COMMANDS: DefaultCommandDefinition[] = [
+  { command: "AT+CFG", description: "Print das configurações do dispositivo." },
+  { command: "AT+GETSENSORVALUE=1", description: "Força um reporte / força um uplink." },
+  { command: "AT+GETSENSORVALUE=0", description: "Visualiza o que foi medido e printa na tela." },
+  { command: "AT+TDC=", description: "Altera o tempo de reporte do dispositivo." },
+  { command: "ATZ", description: "Reinicia o dispositivo." },
+];
+
+export const DEFAULT_NB_USER_COMMANDS: DefaultCommandDefinition[] = [
+  { command: "AT+CFG", description: "Print das configurações do dispositivo." },
+  { command: "AT+GETSENSORVALUE=1", description: "Força um reporte / força um uplink." },
+  { command: "AT+GETSENSORVALUE=0", description: "Visualiza o que foi medido e printa na tela." },
   {
     command: "AT+QBAND=",
-    description: "Configura a Banda NB que o dispositivo deve se conectar",
+    description:
+      "Define as bandas em que o dispositivo irá se conectar. Exemplo: AT+QBAND=2,3,28",
   },
   {
-    command: "AT+PRO=",
-    description: "Configura o protocolo de envio e formatação do Payload",
+    command: "AT+SERVADDR=",
+    description:
+      "Configura o endereço e a porta do broker para o qual o device irá se reportar. Exemplo: test.mosquitto.org,1883",
   },
-  { command: "AT+SERVADDR=", description: "Configura o endereço do servidor" },
-  { command: "AT+CLIENT=", description: "Configura o Client MQTT" },
-  { command: "AT+UNAME=", description: "Configura o usuário MQTT" },
-  { command: "AT+PWD=", description: "Configura a senha MQTT" },
+  { command: "AT+CLIENT=", description: "Configura o Client ID do dispositivo." },
+  { command: "AT+UNAME=", description: "Configura o usuário do broker MQTT." },
+  { command: "AT+PWD=", description: "Configura a senha do usuário MQTT." },
   {
     command: "AT+PUBTOPIC=",
-    description: "Configura o tópico de publicação MQTT",
+    description:
+      'Configura o Tópico de Publicação (Publish). É o "endereço" no servidor para onde o Dragino vai enviar os dados coletados.',
   },
   {
     command: "AT+SUBTOPIC=",
-    description: "Configura o tópico de subscrição MQTT",
+    description:
+      'Configura o Tópico de Subscrição (Subscribe). É o "endereço" que o Dragino vai escutar para receber comandos ou configurações vindas do servidor.',
   },
-  { command: "AT+CCLK=" },
-  { command: "ATZ", description: "Reinicia o DTL/DTN" },
+  { command: "AT+TDC=", description: "Define o intervalo de tempo (em segundos) entre os envios automáticos de dados." },
+  { command: "AT+APN=", description: "Configura o ponto de acesso (APN) da rede celular da operadora." },
+  {
+    command: "AT+PRO=",
+    description: "Define o protocolo de transporte (ex: MQTT, TCP, UDP) e o formato dos dados.",
+  },
 ];
+
+export const DEFAULT_USER_COMMANDS = DEFAULT_NB_USER_COMMANDS;
 
 export const DEFAULT_USER_COMMAND_LABELS = DEFAULT_USER_COMMANDS.map(
   (definition) => definition.command,
 );
 
-export function createDefaultUserCommands(): UserCommand[] {
-  return DEFAULT_USER_COMMANDS.map(({ command, description, requiresValue }) => ({
+export function getDefaultUserCommandDefinitions(deviceType?: KhompDeviceType | null): DefaultCommandDefinition[] {
+  return deviceType === "DTL_LORA" ? DEFAULT_LORA_USER_COMMANDS : DEFAULT_NB_USER_COMMANDS;
+}
+
+export function createDefaultUserCommands(deviceType?: KhompDeviceType | null): UserCommand[] {
+  return getDefaultUserCommandDefinitions(deviceType).map(({ command, description, requiresValue }) => ({
     id: `default:${command}`,
     command,
     description,

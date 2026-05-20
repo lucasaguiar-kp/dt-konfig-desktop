@@ -1,5 +1,5 @@
 import { Copy, PlugZap, Send, Settings, Terminal, Trash2, Unplug, X } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { getBleDeviceIdentity } from "../lib/ble/device-identity";
 import type { BleClient, BleDevice } from "../lib/ble/types";
 import { getKhompDeviceType, getKhompDeviceTypeLabel } from "../lib/constants";
@@ -37,10 +37,14 @@ export function DeviceTerminalPanel({
   const deviceType = device ? getKhompDeviceType(device.name ?? device.localName) : null;
   const deviceAutoConnectKey = device ? getBleDeviceIdentity(device) : null;
   const [inputValue, setInputValue] = useState("");
+  const [sentCommands, setSentCommands] = useState<string[]>([]);
+  const [sentCommandIndex, setSentCommandIndex] = useState<number | null>(null);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isCommandsOpen, setIsCommandsOpen] = useState(false);
   const lastAutoConnectDeviceIdRef = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const historyRef = useRef<HTMLDivElement | null>(null);
+  const commandDraftRef = useRef("");
   const {
     status,
     error,
@@ -65,9 +69,9 @@ export function DeviceTerminalPanel({
 
   useEffect(() => {
     if (device) {
-      ensureDeviceCommands(device.id);
+      ensureDeviceCommands(device.id, deviceType);
     }
-  }, [device, ensureDeviceCommands]);
+  }, [device, deviceType, ensureDeviceCommands]);
 
   useEffect(() => {
     if (!device || !deviceAutoConnectKey) {
@@ -103,11 +107,30 @@ export function DeviceTerminalPanel({
   }, [history]);
 
   function insertCommand(command: string) {
+    setSentCommandIndex(null);
+    setIsHistoryOpen(false);
+    commandDraftRef.current = "";
     setInputValue(command);
     window.requestAnimationFrame(() => {
       inputRef.current?.focus();
       inputRef.current?.setSelectionRange(command.length, command.length);
     });
+  }
+
+  function rememberSentCommand(command: string) {
+    setSentCommands((currentCommands) => {
+      const nextCommands =
+        currentCommands[currentCommands.length - 1] === command ? currentCommands : [...currentCommands, command];
+      return nextCommands.slice(-50);
+    });
+    setSentCommandIndex(null);
+    setIsHistoryOpen(false);
+    commandDraftRef.current = "";
+  }
+
+  async function sendAndRemember(command: string) {
+    await sendCommand(command);
+    rememberSentCommand(command);
   }
 
   async function sendInput(event?: FormEvent<HTMLFormElement>) {
@@ -118,8 +141,52 @@ export function DeviceTerminalPanel({
       return;
     }
 
-    await sendCommand(command);
+    await sendAndRemember(command);
     setInputValue("");
+  }
+
+  function handleInputChange(value: string) {
+    setInputValue(value);
+    setSentCommandIndex(null);
+    setIsHistoryOpen(false);
+    commandDraftRef.current = "";
+  }
+
+  function handleInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "ArrowUp") {
+      if (!sentCommands.length) {
+        return;
+      }
+
+      event.preventDefault();
+      const nextIndex = sentCommandIndex === null ? sentCommands.length - 1 : Math.max(sentCommandIndex - 1, 0);
+
+      if (sentCommandIndex === null) {
+        commandDraftRef.current = inputValue;
+      }
+
+      setSentCommandIndex(nextIndex);
+      setInputValue(sentCommands[nextIndex]);
+      setIsHistoryOpen(false);
+      return;
+    }
+
+    if (event.key === "ArrowDown" && sentCommandIndex !== null) {
+      event.preventDefault();
+      const nextIndex = sentCommandIndex + 1;
+
+      if (nextIndex >= sentCommands.length) {
+        setSentCommandIndex(null);
+        setInputValue(commandDraftRef.current);
+        commandDraftRef.current = "";
+        setIsHistoryOpen(false);
+        return;
+      }
+
+      setSentCommandIndex(nextIndex);
+      setInputValue(sentCommands[nextIndex]);
+      setIsHistoryOpen(false);
+    }
   }
 
   if (!device) {
@@ -201,7 +268,7 @@ export function DeviceTerminalPanel({
               type="button"
               key={command.id}
               onClick={() =>
-                command.requiresValue ? insertCommand(command.command) : void sendCommand(command.command)
+                command.requiresValue ? insertCommand(command.command) : void sendAndRemember(command.command)
               }
               disabled={status !== "connected"}
               title={command.description ?? command.command}
@@ -214,13 +281,38 @@ export function DeviceTerminalPanel({
       ) : null}
 
       <form className="terminal-input-row" onSubmit={(event) => void sendInput(event)}>
-        <span className="input-prompt" aria-hidden="true">
+        <button
+          type="button"
+          className="input-prompt"
+          aria-label="Historico de comandos enviados"
+          aria-haspopup="listbox"
+          aria-expanded={isHistoryOpen}
+          onClick={() => setIsHistoryOpen((isOpen) => (sentCommands.length ? !isOpen : false))}
+          disabled={!sentCommands.length}
+          title="Historico de comandos enviados"
+        >
           ›
-        </span>
+        </button>
+        {isHistoryOpen ? (
+          <div className="command-history-menu" role="listbox" aria-label="Historico de comandos enviados">
+            {[...sentCommands].reverse().map((command) => (
+              <button
+                type="button"
+                key={command}
+                role="option"
+                aria-selected={inputValue === command}
+                onClick={() => insertCommand(command)}
+              >
+                {command}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <input
           ref={inputRef}
           value={inputValue}
-          onChange={(event) => setInputValue(event.target.value)}
+          onChange={(event) => handleInputChange(event.target.value)}
+          onKeyDown={handleInputKeyDown}
           placeholder={stage === "password" ? "Digite a senha do dispositivo" : "Digite um comando AT"}
           aria-label="Entrada do terminal"
           spellCheck={false}
@@ -252,12 +344,13 @@ export function DeviceTerminalPanel({
 
             <CommandManager
               deviceId={device.id}
+              deviceType={deviceType}
               onInsertCommand={(command) => {
                 insertCommand(command);
                 setIsCommandsOpen(false);
               }}
               onSendCommand={(command) => {
-                void sendCommand(command);
+                void sendAndRemember(command);
                 setIsCommandsOpen(false);
               }}
             />
