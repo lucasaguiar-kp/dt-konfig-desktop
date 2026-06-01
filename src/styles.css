@@ -1169,6 +1169,7 @@ button:disabled {
     display: flex;
     flex-direction: column;
     gap: 18px;
+    min-height: 0;
   }
 
   .ota-progress-track {
@@ -1198,22 +1199,82 @@ button:disabled {
     line-height: 1.45;
   }
 
-  .ota-checklist {
-    display: grid;
-    gap: 8px;
-    margin-top: auto;
-    color: var(--fg-2);
-    font-size: 13px;
-  }
-
-  .ota-checklist span {
-    min-height: 34px;
-    padding: 8px 10px;
+  .ota-console {
+    min-height: 260px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
     border: 1px solid var(--line-1);
     border-radius: 7px;
+    background: var(--bg-1);
+    overflow: hidden;
+  }
+
+  .ota-console-heading {
+    min-height: 38px;
+    padding: 0 10px 0 12px;
+    border-bottom: 1px solid var(--line-1);
     display: flex;
     align-items: center;
-    background: var(--bg-1);
+    justify-content: space-between;
+    gap: 10px;
+    color: var(--fg-1);
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .ota-console-heading span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ota-console-output {
+    min-height: 0;
+    flex: 1;
+    overflow: auto;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .ota-console-entry {
+    display: grid;
+    grid-template-columns: 78px minmax(0, 1fr);
+    gap: 10px;
+    color: var(--fg-1);
+  }
+
+  .ota-console-entry time {
+    color: var(--fg-3);
+    white-space: nowrap;
+  }
+
+  .ota-console-entry span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .ota-console-entry-trace span {
+    color: var(--fg-2);
+  }
+
+  .ota-console-entry-success span {
+    color: var(--ok);
+  }
+
+  .ota-console-entry-error span {
+    color: var(--err);
+  }
+
+  .ota-console-empty {
+    margin: auto;
+    color: var(--fg-3);
   }
 
   .success-icon {

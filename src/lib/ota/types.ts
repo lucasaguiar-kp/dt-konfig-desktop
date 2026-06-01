@@ -11,6 +11,16 @@ export interface OtaParams {
   signal?: AbortSignal;
   onProgress?: (percent: number) => void;
   onStatus?: (status: string) => void;
+  onTrace?: (message: string) => void;
+}
+
+export interface OtaFlashStats {
+  chunkSize: number;
+  elapsedMs: number;
+  percent: number;
+  speedBytesPerSecond: number;
+  written: number;
+  total: number;
 }
 
 export interface OtaUuids {

@@ -1,9 +1,26 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, FileUp, Loader2, UploadCloud, XCircle } from "lucide-react";
+import { CheckCircle2, FileUp, Loader2, Terminal, Trash2, UploadCloud, XCircle } from "lucide-react";
 import { tauriBleClient } from "../lib/ble/client";
 import { startDtnNbOta } from "../lib/ota/flow";
 
 type OtaState = "idle" | "running" | "success" | "error";
+type OtaConsoleEntry = {
+  id: string;
+  timestamp: number;
+  level: "info" | "trace" | "success" | "error";
+  message: string;
+};
+
+const MAX_CONSOLE_ENTRIES = 600;
+const TRACE_FLUSH_MS = 200;
+
+function formatConsoleTime(value: number): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(value);
+}
 
 export function OtaView() {
   const [imei, setImei] = useState("");
@@ -13,14 +30,22 @@ export function OtaView() {
   const [status, setStatus] = useState("Aguardando arquivo e IMEI.");
   const [state, setState] = useState<OtaState>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [consoleEntries, setConsoleEntries] = useState<OtaConsoleEntry[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const consoleRef = useRef<HTMLDivElement | null>(null);
+  const traceBufferRef = useRef<OtaConsoleEntry[]>([]);
+  const traceFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentRunPromiseRef = useRef<Promise<void> | null>(null);
   const mountedRef = useRef(true);
+  const lastProgressLogRef = useRef(0);
   const isRunning = state === "running";
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       abortControllerRef.current?.abort();
+      clearTraceQueue();
     };
   }, []);
 
@@ -28,6 +53,82 @@ export function OtaView() {
     () => imei.trim().length > 0 && password.trim().length > 0 && !!file && file.name.toLowerCase().endsWith(".bin"),
     [file, imei, password],
   );
+
+  useEffect(() => {
+    const consoleElement = consoleRef.current;
+    if (!consoleElement) return;
+    consoleElement.scrollTop = consoleElement.scrollHeight;
+  }, [consoleEntries]);
+
+  function buildConsoleEntry(message: string, level: OtaConsoleEntry["level"] = "info"): OtaConsoleEntry {
+    return {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      timestamp: Date.now(),
+      level,
+      message,
+    };
+  }
+
+  function appendConsoleEntries(entriesToAppend: OtaConsoleEntry[]) {
+    if (!entriesToAppend.length) return;
+    setConsoleEntries((entries) => [...entries, ...entriesToAppend].slice(-MAX_CONSOLE_ENTRIES));
+  }
+
+  function appendConsoleEntry(message: string, level: OtaConsoleEntry["level"] = "info") {
+    appendConsoleEntries([buildConsoleEntry(message, level)]);
+  }
+
+  function flushTraceQueue() {
+    if (traceFlushTimerRef.current !== null) {
+      clearTimeout(traceFlushTimerRef.current);
+      traceFlushTimerRef.current = null;
+    }
+
+    const entriesToAppend = traceBufferRef.current;
+    traceBufferRef.current = [];
+    appendConsoleEntries(entriesToAppend);
+  }
+
+  function clearTraceQueue() {
+    if (traceFlushTimerRef.current !== null) {
+      clearTimeout(traceFlushTimerRef.current);
+      traceFlushTimerRef.current = null;
+    }
+    traceBufferRef.current = [];
+  }
+
+  function appendTrace(message: string) {
+    traceBufferRef.current = [...traceBufferRef.current, buildConsoleEntry(message, "trace")].slice(-MAX_CONSOLE_ENTRIES);
+
+    if (traceFlushTimerRef.current === null) {
+      traceFlushTimerRef.current = setTimeout(flushTraceQueue, TRACE_FLUSH_MS);
+    }
+  }
+
+  function replaceConsoleEntries(entries: OtaConsoleEntry[]) {
+    clearTraceQueue();
+    setConsoleEntries(entries.slice(-MAX_CONSOLE_ENTRIES));
+  }
+
+  function updateStatus(message: string) {
+    flushTraceQueue();
+    setStatus(message);
+    appendConsoleEntry(message);
+  }
+
+  function updateProgress(value: number) {
+    setProgress(value);
+    const rounded = Math.round(value);
+    if (rounded >= 100 || rounded - lastProgressLogRef.current >= 10) {
+      lastProgressLogRef.current = rounded;
+      flushTraceQueue();
+      appendConsoleEntry(`Progresso da atualizacao: ${rounded}%`);
+    }
+  }
+
+  function isCurrentController(abortController: AbortController): boolean {
+    return abortControllerRef.current === abortController && !abortController.signal.aborted;
+  }
 
   function selectFile(event: ChangeEvent<HTMLInputElement>) {
     if (isRunning) return;
@@ -38,49 +139,91 @@ export function OtaView() {
     setState("idle");
     setProgress(0);
     setStatus(selected ? `Arquivo selecionado: ${selected.name}` : "Aguardando arquivo e IMEI.");
+    replaceConsoleEntries(selected ? [buildConsoleEntry(`Arquivo selecionado: ${selected.name}`)] : []);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!file || !canStart || isRunning) return;
+    mountedRef.current = true;
+
+    if (currentRunPromiseRef.current) {
+      setState("running");
+      setError(null);
+      setProgress(0);
+      clearTraceQueue();
+      setConsoleEntries([]);
+      updateStatus("Finalizando conexao BLE anterior...");
+      await currentRunPromiseRef.current.catch(() => undefined);
+      if (!mountedRef.current) return;
+    }
 
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
+    lastProgressLogRef.current = 0;
     setState("running");
     setError(null);
     setProgress(0);
-    setStatus("Preparando OTA...");
+    clearTraceQueue();
+    setConsoleEntries([]);
+    updateStatus("Preparando OTA...");
+    appendConsoleEntry(`IMEI usado na busca: ${imei.trim()}`);
+    appendConsoleEntry(`Firmware: ${file.name}`);
 
+    let runPromise: Promise<void> | null = null;
     try {
-      await startDtnNbOta({
+      runPromise = startDtnNbOta({
         bleClient: tauriBleClient,
         imei,
         password,
         file,
         signal: abortController.signal,
-        onProgress: setProgress,
-        onStatus: setStatus,
+        onProgress: (value) => {
+          if (isCurrentController(abortController)) updateProgress(value);
+        },
+        onStatus: (message) => {
+          if (isCurrentController(abortController)) updateStatus(message);
+        },
+        onTrace: (message) => {
+          if (isCurrentController(abortController)) appendTrace(message);
+        },
       });
-      if (!mountedRef.current) return;
+      currentRunPromiseRef.current = runPromise;
+      await runPromise;
+      if (!isCurrentController(abortController)) return;
+      flushTraceQueue();
       setState("success");
       setStatus("OTA concluido. O dispositivo foi reiniciado.");
+      appendConsoleEntry("OTA concluido. O dispositivo foi reiniciado.", "success");
       setProgress(100);
     } catch (err) {
-      if (!mountedRef.current) return;
+      if (!isCurrentController(abortController)) return;
+      flushTraceQueue();
       const message = err instanceof Error ? err.message : "OTA failed. Try again with the device nearby.";
       setError(message);
       setState("error");
       setStatus("OTA interrompido.");
+      appendConsoleEntry(`Erro: ${message}`, "error");
     } finally {
       if (abortControllerRef.current === abortController) {
         abortControllerRef.current = null;
+      }
+      if (currentRunPromiseRef.current === runPromise) {
+        currentRunPromiseRef.current = null;
       }
     }
   }
 
   function cancelOta() {
     abortControllerRef.current?.abort();
-    setStatus("Cancelando OTA...");
+    abortControllerRef.current = null;
+    lastProgressLogRef.current = 0;
+    clearTraceQueue();
+    setError(null);
+    setProgress(0);
+    setState("idle");
+    setStatus("OTA cancelado. Pronto para iniciar novamente.");
+    setConsoleEntries([]);
   }
 
   return (
@@ -106,7 +249,7 @@ export function OtaView() {
           </label>
           <label className="ota-field">
             <span>Senha OTA</span>
-            <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" disabled={isRunning} />
+            <input value={password} onChange={(event) => setPassword(event.target.value)} type="text" disabled={isRunning} />
           </label>
         </div>
 
@@ -150,11 +293,36 @@ export function OtaView() {
         <p className="ota-status-text">{status}</p>
         {error ? <p className="inline-error">{error}</p> : null}
 
-        <div className="ota-checklist">
-          <span>IMEI usado na busca BLE</span>
-          <span>Arquivo validado por extensao, tamanho e assinatura</span>
-          <span>Progresso de flash entre 40% e 95%</span>
-        </div>
+        <section className="ota-console" aria-label="Console da atualizacao">
+          <div className="ota-console-heading">
+            <span>
+              <Terminal size={14} aria-hidden="true" />
+              Console
+            </span>
+            <button
+              type="button"
+              className="icon-button"
+              onClick={() => setConsoleEntries([])}
+              title="Limpar console"
+              disabled={!consoleEntries.length || isRunning}
+            >
+              <Trash2 size={15} aria-hidden="true" />
+            </button>
+          </div>
+          <div ref={consoleRef} className="ota-console-output" role="log" aria-live="polite">
+            {consoleEntries.length ? (
+              consoleEntries.map((entry) => (
+                <div className={`ota-console-entry ota-console-entry-${entry.level}`} key={entry.id}>
+                  <time>{formatConsoleTime(entry.timestamp)}</time>
+                  <span>{entry.message}</span>
+                </div>
+              ))
+            ) : (
+              <div className="ota-console-empty">Aguardando inicio da atualizacao.</div>
+            )}
+          </div>
+        </section>
+
       </section>
     </div>
   );

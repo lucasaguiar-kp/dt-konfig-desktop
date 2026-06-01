@@ -14,7 +14,16 @@ export const LORA_BW = 2;
 export const LORA_TX_POWER = 10;
 
 export const FLASH_BASE_ADDR = 0x08_00_78_00;
-export const CHUNK_SIZE = 96;
+export const FALLBACK_FLASH_CHUNK_SIZE = 96;
+export const STABLE_FLASH_CHUNK_SIZE = 384;
+export const OPTIMIZED_FLASH_CHUNK_SIZE = 480;
+export const FLASH_CHUNK_SIZE_CANDIDATES = [
+  OPTIMIZED_FLASH_CHUNK_SIZE,
+  STABLE_FLASH_CHUNK_SIZE,
+  192,
+  FALLBACK_FLASH_CHUNK_SIZE,
+] as const;
+export const CHUNK_SIZE = FLASH_CHUNK_SIZE_CANDIDATES[0];
 
 export const MAX_FILE_SIZE = 192 * 1024;
 export const MAGIC_STRING = "dragino_6601_ota";
@@ -29,6 +38,8 @@ export const IMEI_SEARCH_TIMEOUT_MS = 90_000;
 export const DEFAULT_MAX_WRITE_BYTES = 20;
 export const SYNC_TIMEOUT_MS = 3500;
 export const CMD_TIMEOUT_MS = 5000;
+export const FLASH_PROBE_TIMEOUT_MS = 2500;
+export const BLE_WRITE_TIMEOUT_MS = 5000;
 export const SYNC_MAX_RETRIES = 6;
 export const CMD_MAX_RETRIES = 2;
 
