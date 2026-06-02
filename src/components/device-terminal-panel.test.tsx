@@ -8,6 +8,7 @@ import { DeviceTerminalPanel } from "./device-terminal-panel";
 class PanelTestClient implements BleClient {
   connectCalls: string[] = [];
   stopScanCalls = 0;
+  private notificationCallback: ((notification: BleNotification) => void) | null = null;
 
   async startScan(): Promise<void> {}
   async stopScan(): Promise<void> {
@@ -33,8 +34,18 @@ class PanelTestClient implements BleClient {
   async onDeviceDiscovered(): Promise<() => void> {
     return () => undefined;
   }
-  async onNotification(_callback: (notification: BleNotification) => void): Promise<() => void> {
+  async onNotification(callback: (notification: BleNotification) => void): Promise<() => void> {
+    this.notificationCallback = callback;
     return () => undefined;
+  }
+
+  emitNotification(text: string) {
+    this.notificationCallback?.({
+      deviceId: "device-1",
+      serviceUuid: "0000ffe0-0000-1000-8000-00805f9b34fb",
+      characteristicUuid: "0000ffe1-0000-1000-8000-00805f9b34fb",
+      value: Array.from(new TextEncoder().encode(text)),
+    });
   }
 }
 
@@ -96,6 +107,28 @@ describe("DeviceTerminalPanel", () => {
     const menu = screen.getByRole("menu", { name: "Ações do terminal" });
     expect(menu).toHaveTextContent("Copiar terminal");
     expect(menu).toHaveTextContent("Limpar terminal");
+  });
+
+  it("does not force the terminal to the bottom when the user is reading older logs", async () => {
+    const client = new PanelTestClient();
+
+    render(<DeviceTerminalPanel device={device} bleClient={client} autoConnect />);
+
+    await waitFor(() => expect(client.connectCalls).toEqual(["device-1"]));
+
+    const history = screen.getByLabelText("Historico do terminal");
+    Object.defineProperties(history, {
+      clientHeight: { configurable: true, value: 120 },
+      scrollHeight: { configurable: true, value: 500 },
+    });
+
+    history.scrollTop = 120;
+    fireEvent.scroll(history);
+
+    client.emitNotification("mensagem nova ok");
+
+    await screen.findByText("mensagem nova ok");
+    expect(history.scrollTop).toBe(120);
   });
 
   it("shows pinned commands above the terminal input instead of inside the commands modal", async () => {

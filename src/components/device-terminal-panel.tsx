@@ -1,5 +1,5 @@
 import { Copy, Loader2, MoreVertical, PlugZap, Send, Settings, Terminal, Trash2, Unplug, X } from "lucide-react";
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getBleDeviceIdentity } from "../lib/ble/device-identity";
 import type { BleClient, BleDevice } from "../lib/ble/types";
 import { getKhompDeviceType, getKhompDeviceTypeLabel } from "../lib/constants";
@@ -45,6 +45,7 @@ export function DeviceTerminalPanel({
   const lastAutoConnectDeviceIdRef = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const historyRef = useRef<HTMLDivElement | null>(null);
+  const shouldFollowHistoryTailRef = useRef(true);
   const commandDraftRef = useRef("");
   const {
     status,
@@ -106,13 +107,29 @@ export function DeviceTerminalPanel({
   );
 
   useEffect(() => {
+    shouldFollowHistoryTailRef.current = true;
+  }, [device?.id]);
+
+  useLayoutEffect(() => {
     const historyElement = historyRef.current;
     if (!historyElement) {
       return;
     }
 
-    historyElement.scrollTop = historyElement.scrollHeight;
-  }, [history]);
+    if (shouldFollowHistoryTailRef.current) {
+      historyElement.scrollTop = historyElement.scrollHeight;
+    }
+  }, [history.length]);
+
+  function handleHistoryScroll() {
+    const historyElement = historyRef.current;
+    if (!historyElement) {
+      return;
+    }
+
+    shouldFollowHistoryTailRef.current =
+      historyElement.scrollHeight - historyElement.scrollTop - historyElement.clientHeight <= 24;
+  }
 
   function insertCommand(command: string) {
     setSentCommandIndex(null);
@@ -308,7 +325,12 @@ export function DeviceTerminalPanel({
         <span>{device.id}</span>
       </div>
 
-      <div ref={historyRef} className="terminal-history" aria-label="Historico do terminal">
+      <div
+        ref={historyRef}
+        className="terminal-history"
+        aria-label="Historico do terminal"
+        onScroll={handleHistoryScroll}
+      >
         {history.length ? (
           history.map((entry) => (
             <div className={`terminal-entry terminal-entry-${entry.direction}`} key={entry.id}>
