@@ -1,4 +1,4 @@
-import { Copy, PlugZap, Send, Settings, Terminal, Trash2, Unplug, X } from "lucide-react";
+import { Copy, Loader2, MoreVertical, PlugZap, Send, Settings, Terminal, Trash2, Unplug, X } from "lucide-react";
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { getBleDeviceIdentity } from "../lib/ble/device-identity";
 import type { BleClient, BleDevice } from "../lib/ble/types";
@@ -41,6 +41,7 @@ export function DeviceTerminalPanel({
   const [sentCommandIndex, setSentCommandIndex] = useState<number | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isCommandsOpen, setIsCommandsOpen] = useState(false);
+  const [isTerminalMenuOpen, setIsTerminalMenuOpen] = useState(false);
   const lastAutoConnectDeviceIdRef = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const historyRef = useRef<HTMLDivElement | null>(null);
@@ -134,6 +135,10 @@ export function DeviceTerminalPanel({
     commandDraftRef.current = "";
   }
 
+  function closeTerminalMenu() {
+    setIsTerminalMenuOpen(false);
+  }
+
   async function sendAndRemember(command: string) {
     await sendCommand(command);
     rememberSentCommand(command);
@@ -216,28 +221,84 @@ export function DeviceTerminalPanel({
           <small>{deviceType ? getKhompDeviceTypeLabel(deviceType) : "Khomp"}</small>
         </div>
         <div className="terminal-actions">
-          <span className={`connection-badge connection-${status}`}>{status}</span>
-          <button type="button" className="tiny-button" onClick={clearTerminal} title="Limpar terminal">
-            <Trash2 size={13} />
-            Limpar
-          </button>
-          <button type="button" className="icon-button" onClick={copyTerminal} title="Copiar terminal">
-            <Copy size={18} />
-          </button>
-          <button type="button" className="tiny-button accent" onClick={() => setIsCommandsOpen(true)}>
-            <Settings size={17} />
-            Comandos
-          </button>
-          {status === "connected" ? (
-            <button type="button" className="icon-button" onClick={() => void disconnect()} title="Desconectar">
-              <Unplug size={18} />
+          {status === "connecting" ? (
+            <button
+              type="button"
+              className="icon-button connection-button connection-connecting"
+              title="Conectando"
+              aria-label="Status: conectando"
+              disabled
+            >
+              <Loader2 className="spin" size={17} aria-hidden="true" />
+            </button>
+          ) : status === "connected" ? (
+            <button
+              type="button"
+              className="icon-button connection-button connection-connected"
+              onClick={() => void disconnect()}
+              title="Desconectar"
+              aria-label="Status: conectado. Desconectar"
+            >
+              <PlugZap size={17} aria-hidden="true" />
             </button>
           ) : (
-            <button type="button" className="control-button primary" onClick={() => void connect()}>
-              <PlugZap size={17} />
-              Conectar
+            <button
+              type="button"
+              className={`icon-button connection-button ${status === "error" ? "connection-error" : "connection-disconnected"}`}
+              onClick={() => void connect()}
+              title="Conectar"
+              aria-label="Status: desconectado. Conectar"
+            >
+              <Unplug size={17} aria-hidden="true" />
             </button>
           )}
+          <button
+            type="button"
+            className="icon-button accent"
+            onClick={() => setIsCommandsOpen(true)}
+            title="Comandos"
+            aria-label="Comandos"
+          >
+            <Settings size={17} aria-hidden="true" />
+          </button>
+          <div className="terminal-menu-anchor">
+            <button
+              type="button"
+              className="icon-button"
+              onClick={() => setIsTerminalMenuOpen((current) => !current)}
+              title="Mais ações"
+              aria-label="Mais ações do terminal"
+              aria-expanded={isTerminalMenuOpen}
+            >
+              <MoreVertical size={17} aria-hidden="true" />
+            </button>
+            {isTerminalMenuOpen ? (
+              <div className="terminal-menu" role="menu" aria-label="Ações do terminal">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    void copyTerminal();
+                    closeTerminalMenu();
+                  }}
+                >
+                  <Copy size={15} aria-hidden="true" />
+                  Copiar terminal
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    clearTerminal();
+                    closeTerminalMenu();
+                  }}
+                >
+                  <Trash2 size={15} aria-hidden="true" />
+                  Limpar terminal
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
       </header>
 

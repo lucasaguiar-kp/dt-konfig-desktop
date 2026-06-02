@@ -79,6 +79,25 @@ describe("DeviceTerminalPanel", () => {
     expect(screen.queryByRole("button", { name: "Senha do dispositivo" })).not.toBeInTheDocument();
   });
 
+  it("renders connection as an icon button and moves copy/clear into the overflow menu", async () => {
+    const client = new PanelTestClient();
+
+    render(<DeviceTerminalPanel device={device} bleClient={client} autoConnect />);
+
+    await waitFor(() => expect(client.connectCalls).toEqual(["device-1"]));
+
+    expect(screen.getByRole("button", { name: /status: conectado/i })).toBeInTheDocument();
+    expect(screen.queryByText("connected")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Copiar terminal" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Limpar terminal" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Mais ações do terminal" }));
+
+    const menu = screen.getByRole("menu", { name: "Ações do terminal" });
+    expect(menu).toHaveTextContent("Copiar terminal");
+    expect(menu).toHaveTextContent("Limpar terminal");
+  });
+
   it("shows pinned commands above the terminal input instead of inside the commands modal", async () => {
     const client = new PanelTestClient();
     useUserCommandsStore.setState({

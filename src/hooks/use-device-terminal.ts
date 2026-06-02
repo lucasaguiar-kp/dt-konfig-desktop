@@ -45,6 +45,14 @@ function normalizeTerminalText(value: string): string {
   return value.replace(/\.{3,}/g, "\n").replace(/\r\n?/g, "\n").trim();
 }
 
+function isBootloaderBanner(value: string): boolean {
+  return /DRAGINO NB bootloader v/i.test(value);
+}
+
+function isDisconnectedTransportError(value: string): boolean {
+  return /device not found|not connected|disconnected|connection.*(closed|lost)|peripheral.*not connected/i.test(value);
+}
+
 function createHistoryEntry(direction: TerminalHistoryEntry["direction"], text: string): TerminalHistoryEntry {
   return {
     id: `${Date.now()}-${Math.random()}`,
@@ -69,6 +77,7 @@ export function useDeviceTerminal({
   const [isBoxModel, setIsBoxModel] = useState(false);
   const terminalCharacteristicRef = useRef<TerminalCharacteristic | null>(null);
   const notificationUnsubscribeRef = useRef<(() => void) | null>(null);
+  const deviceDisconnectedUnsubscribeRef = useRef<(() => void) | null>(null);
   const ownedDeviceRef = useRef<{ deviceId: string; generation: number } | null>(null);
   const rxBufferRef = useRef("");
   const flushTimerRef = useRef<number | null>(null);
@@ -140,8 +149,11 @@ export function useDeviceTerminal({
     const currentDeviceId = ownedDeviceRef.current?.deviceId ?? deviceId;
     const currentCharacteristic = terminalCharacteristicRef.current;
     const unsubscribe = notificationUnsubscribeRef.current;
+    const unsubscribeDeviceDisconnected = deviceDisconnectedUnsubscribeRef.current;
     notificationUnsubscribeRef.current = null;
+    deviceDisconnectedUnsubscribeRef.current = null;
     terminalCharacteristicRef.current = null;
+    unsubscribeDeviceDisconnected?.();
     await cleanupConnection(currentDeviceId, currentCharacteristic, unsubscribe, {
       generation: disconnectGeneration,
       clearCurrentState: true,
@@ -152,6 +164,29 @@ export function useDeviceTerminal({
       setStatus("disconnected");
     }
   }, [cleanupConnection, deviceId, isGenerationCurrent]);
+
+  const markTerminalDisconnected = useCallback(
+    (targetDeviceId: string | null, message = "Dispositivo desconectado.") => {
+      const currentDeviceId = ownedDeviceRef.current?.deviceId ?? deviceId;
+      if (!targetDeviceId || !currentDeviceId || String(targetDeviceId) !== String(currentDeviceId)) {
+        return;
+      }
+
+      connectionGenerationRef.current += 1;
+      clearFlushTimer();
+      rxBufferRef.current = "";
+      notificationUnsubscribeRef.current?.();
+      deviceDisconnectedUnsubscribeRef.current?.();
+      notificationUnsubscribeRef.current = null;
+      deviceDisconnectedUnsubscribeRef.current = null;
+      terminalCharacteristicRef.current = null;
+      ownedDeviceRef.current = null;
+      setError(null);
+      setStatus("disconnected");
+      appendHistory("system", message);
+    },
+    [appendHistory, clearFlushTimer, deviceId],
+  );
 
   const flushRxBuffer = useCallback(() => {
     clearFlushTimer();
@@ -168,6 +203,11 @@ export function useDeviceTerminal({
     }
 
     appendHistory("rx", text);
+
+    if (isBootloaderBanner(text)) {
+      markTerminalDisconnected(ownedDeviceRef.current?.deviceId ?? deviceId);
+      return;
+    }
 
     const terminalState: DeviceTerminalEvent = {
       deviceType,
@@ -206,7 +246,7 @@ export function useDeviceTerminal({
       setError(message);
       appendHistory("system", message);
     }
-  }, [appendHistory, clearFlushTimer, deviceType]);
+  }, [appendHistory, clearFlushTimer, deviceId, deviceType, markTerminalDisconnected]);
 
   const handleAscii = useCallback(
     (ascii: string) => {
@@ -257,6 +297,7 @@ export function useDeviceTerminal({
 
     let attemptedCharacteristic: TerminalCharacteristic | null = null;
     let attemptedUnsubscribe: (() => void) | null = null;
+    let attemptedDeviceDisconnectedUnsubscribe: (() => void) | null = null;
 
     try {
       await stopScan?.();
@@ -306,8 +347,13 @@ export function useDeviceTerminal({
         }
       });
       attemptedUnsubscribe = unsubscribe;
+      const unsubscribeDeviceDisconnected = await client.onDeviceDisconnected?.((event) => {
+        if (isCurrentAttempt()) markTerminalDisconnected(event.deviceId);
+      });
+      attemptedDeviceDisconnectedUnsubscribe = unsubscribeDeviceDisconnected ?? null;
       if (!isCurrentAttempt()) {
         unsubscribe();
+        unsubscribeDeviceDisconnected?.();
         attemptedUnsubscribe = null;
         await cleanupConnection(connectionDeviceId, null, null, { generation: attemptId, clearCurrentState: false });
         return;
@@ -328,10 +374,13 @@ export function useDeviceTerminal({
 
       terminalCharacteristicRef.current = terminalCharacteristic;
       notificationUnsubscribeRef.current = unsubscribe;
+      deviceDisconnectedUnsubscribeRef.current = unsubscribeDeviceDisconnected ?? null;
+      attemptedDeviceDisconnectedUnsubscribe = null;
       setStatus("connected");
       appendHistory("system", "Conectado ao terminal BLE.");
     } catch (connectError) {
       if (!isCurrentAttempt()) {
+        attemptedDeviceDisconnectedUnsubscribe?.();
         await cleanupConnection(deviceId, attemptedCharacteristic, attemptedUnsubscribe, {
           generation: attemptId,
           clearCurrentState: false,
@@ -340,6 +389,7 @@ export function useDeviceTerminal({
       }
 
       const message = getErrorMessage(connectError);
+      attemptedDeviceDisconnectedUnsubscribe?.();
       await cleanupConnection(connectionDeviceId, attemptedCharacteristic, attemptedUnsubscribe, {
         generation: attemptId,
         clearCurrentState: true,
@@ -349,6 +399,7 @@ export function useDeviceTerminal({
         ownedDeviceRef.current = null;
         terminalCharacteristicRef.current = null;
         notificationUnsubscribeRef.current = null;
+        deviceDisconnectedUnsubscribeRef.current = null;
         setError(message);
         appendHistory("system", message);
         setStatus("error");
@@ -361,6 +412,7 @@ export function useDeviceTerminal({
     deviceId,
     disconnect,
     handleAscii,
+    markTerminalDisconnected,
     resolveDeviceIdBeforeConnect,
     stopScan,
   ]);
@@ -401,14 +453,21 @@ export function useDeviceTerminal({
             bytes,
             bytes.length,
           );
-        } catch {
-          const message = getErrorMessage(writeError);
+        } catch (fallbackError) {
+          const writeMessage = getErrorMessage(writeError);
+          const fallbackMessage = getErrorMessage(fallbackError);
+          const message = isDisconnectedTransportError(fallbackMessage) ? fallbackMessage : writeMessage;
+          if (isDisconnectedTransportError(message)) {
+            markTerminalDisconnected(targetDeviceId, "Dispositivo desconectado.");
+            return;
+          }
+
           setError(message);
           appendHistory("system", message);
         }
       }
     },
-    [appendHistory, client, deviceId, deviceType],
+    [appendHistory, client, deviceId, deviceType, markTerminalDisconnected],
   );
 
   const copyTerminal = useCallback(async () => {

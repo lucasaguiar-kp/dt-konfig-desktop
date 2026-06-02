@@ -13,16 +13,17 @@ use btleplug::{
 };
 use futures_util::StreamExt;
 use tauri::{async_runtime, AppHandle, Emitter};
-use tokio::time::sleep;
 use tokio::sync::oneshot;
+use tokio::time::sleep;
 use uuid::Uuid;
 
 use super::types::{
-    BleCharacteristicPayload, BleCharacteristicPropertiesPayload, BleDevicePayload,
-    BleNotificationPayload,
+    BleCharacteristicPayload, BleCharacteristicPropertiesPayload, BleDeviceDisconnectedPayload,
+    BleDevicePayload, BleNotificationPayload,
 };
 
 const DEVICE_DISCOVERED_EVENT: &str = "ble://device-discovered";
+const DEVICE_DISCONNECTED_EVENT: &str = "ble://device-disconnected";
 const NOTIFICATION_EVENT: &str = "ble://notification";
 
 #[derive(Default)]
@@ -118,7 +119,8 @@ impl BleManagerState {
     pub async fn connect(&self, device_id: String) -> Result<(), String> {
         let adapter = self.adapter().await?;
         let should_refresh_cache = !self.inner.lock().await.scanning;
-        let peripheral = peripheral_with_cache_refresh(&adapter, &device_id, should_refresh_cache).await?;
+        let peripheral =
+            peripheral_with_cache_refresh(&adapter, &device_id, should_refresh_cache).await?;
 
         if !peripheral.is_connected().await.map_err(format_ble_error)? {
             peripheral.connect().await.map_err(format_ble_error)?;
@@ -350,8 +352,16 @@ async fn run_scan_session(
     emit_known_peripherals(&app_handle, &adapter).await;
 
     while let Some(event) = events.next().await {
-        if let Some(peripheral_id) = event_peripheral_id(&event) {
-            emit_peripheral(&app_handle, &adapter, &peripheral_id).await;
+        match event {
+            CentralEvent::DeviceDisconnected(peripheral_id) => {
+                emit_device_disconnected(&app_handle, &peripheral_id.to_string());
+                emit_peripheral(&app_handle, &adapter, &peripheral_id).await;
+            }
+            event => {
+                if let Some(peripheral_id) = event_peripheral_id(&event) {
+                    emit_peripheral(&app_handle, &adapter, &peripheral_id).await;
+                }
+            }
         }
     }
 
@@ -420,6 +430,7 @@ async fn run_notification_session(
         let _ = app_handle.emit(NOTIFICATION_EVENT, payload);
     }
 
+    emit_device_disconnected(&app_handle, &device_id);
     let _ = peripheral.unsubscribe(&characteristic).await;
     clear_notification_session(&inner, &key, generation).await;
 }
@@ -494,8 +505,7 @@ async fn find_peripheral(adapter: &Adapter, device_id: &str) -> Result<Option<Pe
 
     Ok(peripherals
         .into_iter()
-        .find(|peripheral| ids_match(&peripheral.id().to_string(), device_id))
-    )
+        .find(|peripheral| ids_match(&peripheral.id().to_string(), device_id)))
 }
 
 async fn characteristic(
@@ -567,6 +577,15 @@ async fn emit_peripheral_with_properties(app_handle: &AppHandle, peripheral: &Pe
 
     let payload = device_payload(peripheral, properties);
     let _ = app_handle.emit(DEVICE_DISCOVERED_EVENT, payload);
+}
+
+fn emit_device_disconnected(app_handle: &AppHandle, device_id: &str) {
+    let _ = app_handle.emit(
+        DEVICE_DISCONNECTED_EVENT,
+        BleDeviceDisconnectedPayload {
+            device_id: device_id.to_string(),
+        },
+    );
 }
 
 fn device_payload(peripheral: &Peripheral, properties: PeripheralProperties) -> BleDevicePayload {
@@ -662,7 +681,9 @@ fn normalize_uuid_alias(uuid: &str) -> String {
     normalized
         .strip_prefix("0000")
         .and_then(|value| value.strip_suffix("-0000-1000-8000-00805f9b34fb"))
-        .filter(|value| value.len() == 4 && value.chars().all(|character| character.is_ascii_hexdigit()))
+        .filter(|value| {
+            value.len() == 4 && value.chars().all(|character| character.is_ascii_hexdigit())
+        })
         .map(str::to_string)
         .unwrap_or(normalized)
 }

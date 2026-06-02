@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { BleCharacteristic, BleClient, BleDevice, BleNotification } from "./types";
+import type { BleCharacteristic, BleClient, BleDevice, BleDeviceDisconnected, BleNotification } from "./types";
 
 export const tauriBleClient: BleClient = {
   startScan: () => invoke("ble_start_scan"),
@@ -22,6 +22,10 @@ export const tauriBleClient: BleClient = {
   },
   async onNotification(callback) {
     const unlisten = await listen<BleNotification>("ble://notification", (event) => callback(event.payload));
+    return unlisten;
+  },
+  async onDeviceDisconnected(callback) {
+    const unlisten = await listen<BleDeviceDisconnected>("ble://device-disconnected", (event) => callback(event.payload));
     return unlisten;
   },
 };

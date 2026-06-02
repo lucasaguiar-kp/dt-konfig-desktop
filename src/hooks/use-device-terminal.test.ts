@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { BleCharacteristic, BleClient, BleDevice, BleNotification } from "../lib/ble/types";
+import type { BleCharacteristic, BleClient, BleDevice, BleDeviceDisconnected, BleNotification } from "../lib/ble/types";
 import { useDeviceTerminal } from "./use-device-terminal";
 
 function createDeferred<T>() {
@@ -21,12 +21,17 @@ class TerminalTestClient implements BleClient {
   startNotifyDeferredByDevice = new Map<string, ReturnType<typeof createDeferred<void>>>();
   startNotifyErrorByDevice = new Map<string, Error>();
   connectDeferredByDevice = new Map<string, ReturnType<typeof createDeferred<void>>>();
+  writeError: Error | null = null;
+  writeWithoutResponseError: Error | null = null;
   connectCalls: string[] = [];
   disconnectCalls: string[] = [];
+  writeCalls: Array<[string, string, string, number[]]> = [];
   startNotifyCalls: Array<[string, string, string]> = [];
   stopNotifyCalls: Array<[string, string, string]> = [];
   onNotificationUnlistenCalls = 0;
+  onDeviceDisconnectedUnlistenCalls = 0;
   private notificationCallbacks = new Set<(notification: BleNotification) => void>();
+  private disconnectedCallbacks = new Set<(event: BleDeviceDisconnected) => void>();
 
   async startScan(): Promise<void> {}
   async stopScan(): Promise<void> {}
@@ -75,8 +80,18 @@ class TerminalTestClient implements BleClient {
     this.stopNotifyCalls.push([deviceId, serviceUuid, characteristicUuid]);
   }
 
-  async write(): Promise<void> {}
-  async writeWithoutResponse(): Promise<void> {}
+  async write(deviceId: string, serviceUuid: string, characteristicUuid: string, value: number[]): Promise<void> {
+    this.writeCalls.push([deviceId, serviceUuid, characteristicUuid, value]);
+    if (this.writeError) {
+      throw this.writeError;
+    }
+  }
+
+  async writeWithoutResponse(): Promise<void> {
+    if (this.writeWithoutResponseError) {
+      throw this.writeWithoutResponseError;
+    }
+  }
   async onDeviceDiscovered(_callback: (device: BleDevice) => void): Promise<() => void> {
     return () => undefined;
   }
@@ -89,9 +104,23 @@ class TerminalTestClient implements BleClient {
     };
   }
 
+  async onDeviceDisconnected(_callback: (event: BleDeviceDisconnected) => void): Promise<() => void> {
+    this.disconnectedCallbacks.add(_callback);
+    return () => {
+      this.disconnectedCallbacks.delete(_callback);
+      this.onDeviceDisconnectedUnlistenCalls += 1;
+    };
+  }
+
   emitNotification(notification: BleNotification): void {
     for (const callback of this.notificationCallbacks) {
       callback(notification);
+    }
+  }
+
+  emitDisconnected(event: BleDeviceDisconnected): void {
+    for (const callback of this.disconnectedCallbacks) {
+      callback(event);
     }
   }
 }
@@ -414,6 +443,101 @@ describe("useDeviceTerminal", () => {
     expect(logText).toContain("378d0c");
     expect(logText).toContain("PASSWORD TIMEOUT");
     expect(logText).toContain("Tempo para senha expirado.");
+  });
+
+  it("marks the terminal as disconnected when the connected device drops the BLE link", async () => {
+    const client = new TerminalTestClient();
+    client.servicesByDevice.set("device-a", TERMINAL_CHARACTERISTICS);
+    const { result } = renderHook(() =>
+      useDeviceTerminal({
+        client,
+        deviceId: "device-a",
+        deviceType: "DTN_NB",
+      }),
+    );
+
+    await act(async () => {
+      await result.current.connect();
+      await result.current.sendCommand("ATZ");
+    });
+
+    expect(result.current.status).toBe("connected");
+
+    act(() => {
+      client.emitDisconnected({ deviceId: "device-a" });
+    });
+
+    expect(result.current.status).toBe("disconnected");
+    expect(result.current.history.map((entry) => entry.text)).toEqual(
+      expect.arrayContaining(["Conectado ao terminal BLE.", "ATZ", "Dispositivo desconectado."]),
+    );
+    expect(client.onNotificationUnlistenCalls).toBeGreaterThan(0);
+    expect(client.onDeviceDisconnectedUnlistenCalls).toBeGreaterThan(0);
+  });
+
+  it("marks the terminal as disconnected when the device enters the bootloader after ATZ", async () => {
+    vi.useFakeTimers();
+    const client = new TerminalTestClient();
+    client.servicesByDevice.set("device-a", TERMINAL_CHARACTERISTICS);
+    const { result } = renderHook(() =>
+      useDeviceTerminal({
+        client,
+        deviceId: "device-a",
+        deviceType: "DTN_NB",
+      }),
+    );
+
+    await act(async () => {
+      await result.current.connect();
+      await result.current.sendCommand("ATZ");
+    });
+
+    act(() => {
+      client.emitNotification({
+        deviceId: "device-a",
+        serviceUuid: "ffe0",
+        characteristicUuid: "ffe1",
+        value: textToBytes("DRAGINO NB bootloader v1.2"),
+      });
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(400);
+    });
+
+    expect(result.current.status).toBe("disconnected");
+    expect(result.current.history.map((entry) => entry.text)).toEqual(
+      expect.arrayContaining(["ATZ", "DRAGINO NB bootloader v1.2", "Dispositivo desconectado."]),
+    );
+  });
+
+  it("marks the terminal as disconnected when sending to a device that is already gone", async () => {
+    const client = new TerminalTestClient();
+    client.servicesByDevice.set("device-a", TERMINAL_CHARACTERISTICS);
+    const { result } = renderHook(() =>
+      useDeviceTerminal({
+        client,
+        deviceId: "device-a",
+        deviceType: "DTN_NB",
+      }),
+    );
+
+    await act(async () => {
+      await result.current.connect();
+    });
+
+    client.writeError = new Error("BLE device not found: device-a");
+    client.writeWithoutResponseError = new Error("BLE device not found: device-a");
+
+    await act(async () => {
+      await result.current.sendCommand("ATZ");
+    });
+
+    expect(result.current.status).toBe("disconnected");
+    expect(result.current.error).toBeNull();
+    expect(result.current.history.map((entry) => entry.text)).toEqual(
+      expect.arrayContaining(["ATZ", "Dispositivo desconectado."]),
+    );
   });
 
   it("keeps the terminal log across failed and successful reconnect attempts", async () => {

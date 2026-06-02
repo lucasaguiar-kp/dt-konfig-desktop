@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { MouseEvent } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { Radio, UploadCloud } from "lucide-react";
+import { AppUpdateButton } from "./components/app-update-button";
 import { DevicesView } from "./views/devices-view";
 import { OtaView } from "./views/ota-view";
 
@@ -67,6 +68,7 @@ export function App() {
             </span>
             <span className="titlebar-breadcrumb">{VIEW_BREADCRUMBS[view]}</span>
           </div>
+          <AppUpdateButton />
         </div>
 
         <div className="app-body">

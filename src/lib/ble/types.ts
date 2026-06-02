@@ -24,6 +24,10 @@ export type BleNotification = {
   value: number[];
 };
 
+export type BleDeviceDisconnected = {
+  deviceId: string;
+};
+
 export type BleClient = {
   startScan(): Promise<void>;
   stopScan(): Promise<void>;
@@ -48,4 +52,5 @@ export type BleClient = {
   ): Promise<void>;
   onDeviceDiscovered(callback: (device: BleDevice) => void): Promise<() => void>;
   onNotification(callback: (notification: BleNotification) => void): Promise<() => void>;
+  onDeviceDisconnected?(callback: (event: BleDeviceDisconnected) => void): Promise<() => void>;
 };

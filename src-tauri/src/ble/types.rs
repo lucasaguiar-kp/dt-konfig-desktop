@@ -38,6 +38,12 @@ pub struct BleNotificationPayload {
     pub value: Vec<u8>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BleDeviceDisconnectedPayload {
+    pub device_id: String,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WriteRequest {
