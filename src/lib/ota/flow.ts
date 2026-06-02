@@ -1,7 +1,7 @@
 import type { BleClient, BleDevice } from "../ble/types";
 import { createCancelError, throwIfAborted } from "./abort";
 import { OtaBleSession } from "./ble-session";
-import { DEFAULT_WRITE_CHAR_UUID, FLASH_BASE_ADDR, IMEI_SEARCH_TIMEOUT_MS } from "./constants";
+import { DEFAULT_WRITE_CHAR_UUID, FLASH_BASE_ADDR, IMEI_SEARCH_TIMEOUT_MS, OTA_MAX_WRITE_BYTES } from "./constants";
 import { validateFirmwareFile } from "./file";
 import { otaWarn } from "./logger";
 import { eraseFlash } from "./steps/erase";
@@ -15,8 +15,13 @@ function normalizeImei(value: string): string {
   return value.trim().toLowerCase();
 }
 
+// Match the home scan, which identifies Khomp devices by `name ?? localName`. Some devices
+// advertise the IMEI only in the localName (with name absent or the literal string "NULL"),
+// so we compare the entered IMEI/BLE name against BOTH fields.
 function isImeiDevice(device: BleDevice, imei: string): boolean {
-  return normalizeImei(device.name ?? "") === normalizeImei(imei);
+  const target = normalizeImei(imei);
+  if (!target) return false;
+  return normalizeImei(device.name ?? "") === target || normalizeImei(device.localName ?? "") === target;
 }
 
 function userMessageForError(error: unknown): string {
@@ -179,7 +184,7 @@ export async function startDtnNbOta({
     onTrace?.(`BLE device encontrado: id=${device.id}, name=${device.name ?? "sem nome"}, rssi=${device.rssi}`);
 
     throwIfAborted(signal);
-    session = new OtaBleSession(bleClient, device.id, undefined, onTrace);
+    session = new OtaBleSession(bleClient, device.id, OTA_MAX_WRITE_BYTES, onTrace);
 
     onStatus?.("Connecting to BLE device...");
     await session.connect();
@@ -199,7 +204,7 @@ export async function startDtnNbOta({
     const writeCharUuid = discovery.uuids.writeCharUuid;
     throwIfAborted(signal);
     onStatus?.("Synchronizing with bootloader...");
-    const activeUuid = await runSyncHandshake(session, discovery.uuids.serviceUuid, writeCharUuid, normalizedPassword, signal);
+    const activeUuid = await runSyncHandshake(session, discovery.uuids.serviceUuid, writeCharUuid, normalizedPassword, signal, onTrace);
 
     throwIfAborted(signal);
     onStatus?.("Reading bootloader version...");

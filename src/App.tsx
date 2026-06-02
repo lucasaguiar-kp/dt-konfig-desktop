@@ -8,6 +8,16 @@ import { OtaView } from "./views/ota-view";
 
 type AppView = "devices" | "ota";
 
+const NAV_ITEMS: { id: AppView; label: string; icon: typeof Radio }[] = [
+  { id: "devices", label: "Dispositivos", icon: Radio },
+  { id: "ota", label: "OTA", icon: UploadCloud },
+];
+
+const VIEW_BREADCRUMBS: Record<AppView, string> = {
+  devices: "Dispositivos",
+  ota: "OTA",
+};
+
 function isTauriRuntime() {
   return "__TAURI_INTERNALS__" in window;
 }
@@ -50,29 +60,40 @@ export function App() {
           onMouseDown={handleTitlebarMouseDown}
           onDoubleClick={handleTitlebarDoubleClick}
         >
-          <div className="titlebar-brand">
-            <h1>DT Konfig</h1>
+          <div className="titlebar-content">
+            <h1 className="titlebar-title">DT Konfig</h1>
+            <span className="titlebar-sep" aria-hidden="true">
+              /
+            </span>
+            <span className="titlebar-breadcrumb">{VIEW_BREADCRUMBS[view]}</span>
           </div>
-          <nav className="titlebar-nav" aria-label="Navegacao principal">
-            <button
-              type="button"
-              className={view === "devices" ? "titlebar-tab active" : "titlebar-tab"}
-              onClick={() => setView("devices")}
-            >
-              <Radio size={14} />
-              Devices
-            </button>
-            <button
-              type="button"
-              className={view === "ota" ? "titlebar-tab active" : "titlebar-tab"}
-              onClick={() => setView("ota")}
-            >
-              <UploadCloud size={14} />
-              OTA
-            </button>
-          </nav>
         </div>
-        <section className="workspace">{view === "devices" ? <DevicesView /> : <OtaView />}</section>
+
+        <div className="app-body">
+          <nav className="activity-bar" aria-label="Navegação principal">
+            <div className="activity-brand" aria-hidden="true">
+              DT
+            </div>
+            <div className="activity-group">
+              {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={view === id ? "activity-item active" : "activity-item"}
+                  onClick={() => setView(id)}
+                  title={label}
+                  aria-label={label}
+                  aria-current={view === id ? "page" : undefined}
+                >
+                  <Icon size={20} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+            <div className="activity-spacer" />
+          </nav>
+
+          <section className="workspace">{view === "devices" ? <DevicesView /> : <OtaView />}</section>
+        </div>
       </div>
     </main>
   );

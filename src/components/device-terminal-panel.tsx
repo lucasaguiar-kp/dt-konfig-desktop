@@ -4,6 +4,7 @@ import { getBleDeviceIdentity } from "../lib/ble/device-identity";
 import type { BleClient, BleDevice } from "../lib/ble/types";
 import { getKhompDeviceType, getKhompDeviceTypeLabel } from "../lib/constants";
 import { useDeviceTerminal } from "../hooks/use-device-terminal";
+import { useCommandHistoryStore } from "../stores/command-history-store";
 import { useUserCommandsStore } from "../stores/user-commands-store";
 import { CommandManager } from "./command-manager";
 
@@ -37,7 +38,6 @@ export function DeviceTerminalPanel({
   const deviceType = device ? getKhompDeviceType(device.name ?? device.localName) : null;
   const deviceAutoConnectKey = device ? getBleDeviceIdentity(device) : null;
   const [inputValue, setInputValue] = useState("");
-  const [sentCommands, setSentCommands] = useState<string[]>([]);
   const [sentCommandIndex, setSentCommandIndex] = useState<number | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isCommandsOpen, setIsCommandsOpen] = useState(false);
@@ -66,6 +66,8 @@ export function DeviceTerminalPanel({
   const ensureDeviceCommands = useUserCommandsStore((state) => state.ensureDeviceCommands);
   const commandsByDevice = useUserCommandsStore((state) => state.deviceCommands);
   const pinnedByDevice = useUserCommandsStore((state) => state.devicePinnedCommandIds);
+  const commandHistoryByDevice = useCommandHistoryStore((state) => state.deviceCommandHistory);
+  const rememberCommand = useCommandHistoryStore((state) => state.rememberCommand);
 
   useEffect(() => {
     if (device) {
@@ -97,6 +99,11 @@ export function DeviceTerminalPanel({
     return commands.filter((command) => pinnedIds.includes(command.id));
   }, [commandsByDevice, device, pinnedByDevice]);
 
+  const sentCommands = useMemo(
+    () => (device ? commandHistoryByDevice[device.id] ?? [] : []),
+    [commandHistoryByDevice, device],
+  );
+
   useEffect(() => {
     const historyElement = historyRef.current;
     if (!historyElement) {
@@ -118,11 +125,10 @@ export function DeviceTerminalPanel({
   }
 
   function rememberSentCommand(command: string) {
-    setSentCommands((currentCommands) => {
-      const nextCommands =
-        currentCommands[currentCommands.length - 1] === command ? currentCommands : [...currentCommands, command];
-      return nextCommands.slice(-50);
-    });
+    if (device) {
+      rememberCommand(device.id, command);
+    }
+
     setSentCommandIndex(null);
     setIsHistoryOpen(false);
     commandDraftRef.current = "";

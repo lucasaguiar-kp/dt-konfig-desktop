@@ -15,13 +15,20 @@
   --fg-2: #8792a3;
   --fg-3: #5d6877;
   --acc: #5ec6d6;
+  --acc-2: #6ea8fe;
+  --acc-strong: #7fd6e4;
   --ok: #5fc592;
   --warn: #e3b15a;
   --err: #ff6b61;
+  --red: #ff5a52;
+  --blue: #5aa6ff;
   --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
   --font-mono: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
-  --titlebar-h: 50px;
-  --traffic-lights-w: 86px;
+  --titlebar-h: 44px;
+  --traffic-lights-w: 84px;
+  --activity-w: 52px;
+  --radius: 6px;
+  --shadow-panel: 0 18px 48px rgba(0, 0, 0, 0.42);
   font-family: var(--font-ui);
 }
 
@@ -58,12 +65,48 @@ button:disabled {
   opacity: 0.52;
 }
 
+::selection {
+  background: color-mix(in srgb, var(--acc) 32%, transparent);
+  color: var(--fg-0);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  background-color: var(--line-2);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--fg-3) 70%, var(--line-2));
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--acc) 60%, transparent);
+  outline-offset: 1px;
+}
+
 @layer components {
   .app-shell {
     height: 100vh;
     padding: 0;
     background:
-      radial-gradient(circle at 20% -10%, rgba(94, 198, 214, 0.12), transparent 30%),
+      radial-gradient(circle at 18% -12%, rgba(94, 198, 214, 0.1), transparent 32%),
+      radial-gradient(circle at 92% 0%, rgba(110, 168, 254, 0.07), transparent 30%),
       linear-gradient(180deg, #0b0d12, #050608);
   }
 
@@ -82,48 +125,123 @@ button:disabled {
     flex: 0 0 auto;
     display: flex;
     align-items: center;
-    justify-content: flex-end;
     padding: 0 16px 0 var(--traffic-lights-w);
     border-bottom: 1px solid var(--line-1);
-    background: #080a0f;
+    background: linear-gradient(180deg, #0b0e14, #080a0f);
     -webkit-app-region: drag;
   }
 
-  .titlebar-brand {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
+  .titlebar-content {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
   }
 
-  .titlebar-brand h1 {
+  .titlebar-title {
     margin: 0;
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 700;
     color: var(--fg-0);
     line-height: 1;
+    letter-spacing: 0.01em;
   }
 
-  .titlebar-brand span {
-    font-size: 11px;
+  .titlebar-sep {
+    color: var(--fg-3);
+    font-size: 12px;
+  }
+
+  .titlebar-breadcrumb {
+    overflow: hidden;
     color: var(--fg-2);
+    font-size: 12px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .titlebar-nav {
-    margin-left: auto;
+  .app-body {
+    min-height: 0;
+    flex: 1;
+    display: grid;
+    grid-template-columns: var(--activity-w) minmax(0, 1fr);
+  }
+
+  .activity-bar {
     display: flex;
+    flex-direction: column;
+    align-items: center;
     gap: 6px;
-    -webkit-app-region: no-drag;
+    padding: 10px 0 12px;
+    border-right: 1px solid var(--line-1);
+    background: #080a0f;
   }
 
-  .titlebar-tab,
+  .activity-brand {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 6px;
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(150deg, var(--acc), var(--acc-2));
+    color: #061015;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--acc) 30%, transparent);
+  }
+
+  .activity-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .activity-item {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    color: var(--fg-3);
+    transition: color 120ms ease, background 120ms ease;
+  }
+
+  .activity-item:hover {
+    color: var(--fg-1);
+    background: color-mix(in srgb, var(--fg-0) 6%, transparent);
+  }
+
+  .activity-item.active {
+    color: var(--acc);
+    background: color-mix(in srgb, var(--acc) 12%, transparent);
+  }
+
+  .activity-item.active::before {
+    content: "";
+    position: absolute;
+    left: -10px;
+    top: 9px;
+    bottom: 9px;
+    width: 2px;
+    border-radius: 0 2px 2px 0;
+    background: var(--acc);
+  }
+
+  .activity-spacer {
+    flex: 1;
+  }
+
   .tiny-button,
   .control-button,
   .icon-button {
     border: 1px solid var(--line-2);
-    border-radius: 5px;
+    border-radius: var(--radius);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -133,14 +251,19 @@ button:disabled {
     transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
   }
 
-  .titlebar-tab {
-    height: 30px;
-    padding: 0 12px;
-    font-size: 12px;
-    font-weight: 600;
+  .control-button:not(:disabled):not(.primary):hover,
+  .icon-button:not(:disabled):not(.primary):hover {
+    border-color: color-mix(in srgb, var(--fg-2) 45%, var(--line-2));
+    background: var(--bg-4);
+    color: var(--fg-0);
   }
 
-  .titlebar-tab.active,
+  .control-button.primary:not(:disabled):hover,
+  .icon-button.primary:not(:disabled):hover {
+    background: var(--acc-strong);
+    border-color: var(--acc-strong);
+  }
+
   .tiny-button.accent {
     border-color: color-mix(in srgb, var(--acc) 42%, var(--line-2));
     background: color-mix(in srgb, var(--acc) 12%, var(--bg-3));
@@ -148,8 +271,8 @@ button:disabled {
   }
 
   .workspace {
+    min-width: 0;
     min-height: 0;
-    flex: 1;
     overflow: hidden;
   }
 
@@ -1066,46 +1189,113 @@ button:disabled {
     flex: 1;
   }
 
-  .ota-view {
+  .ota-wizard {
     height: 100%;
     min-height: 0;
     display: grid;
-    grid-template-columns: minmax(420px, 0.9fr) minmax(440px, 1.1fr);
-    gap: 12px;
-    padding: 12px;
-    overflow: auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    background: var(--bg-1);
   }
 
-  .ota-panel {
-    min-width: 0;
-    border: 1px solid var(--line-1);
-    border-radius: 7px;
+  .ota-wizard-header {
+    flex: 0 0 auto;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--line-1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
     background: var(--bg-2);
-    padding: 20px;
   }
 
-  .ota-form-panel {
-    height: 100%;
-    align-self: stretch;
+  .ota-wizard-heading h2 {
+    margin: 0;
+    font-size: 19px;
+    line-height: 1.15;
+  }
+
+  .ota-stepper {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .ota-step {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px 6px 7px;
+    border-radius: 999px;
+    color: var(--fg-3);
+    font-size: 12px;
+    font-weight: 650;
+    white-space: nowrap;
+    transition: color 140ms ease, background 140ms ease;
+  }
+
+  .ota-step + .ota-step::before {
+    content: "";
+    width: 16px;
+    height: 1px;
+    margin-right: 2px;
+    background: var(--line-2);
+  }
+
+  .ota-step-marker {
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    background: var(--bg-4);
+    color: var(--fg-2);
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .ota-step-active {
+    color: var(--acc);
+    background: color-mix(in srgb, var(--acc) 12%, transparent);
+  }
+
+  .ota-step-active .ota-step-marker {
+    background: var(--acc);
+    color: #061015;
+  }
+
+  .ota-step-done {
+    color: var(--ok);
+  }
+
+  .ota-step-done .ota-step-marker {
+    background: color-mix(in srgb, var(--ok) 22%, transparent);
+    color: var(--ok);
+  }
+
+  .ota-wizard-body {
+    min-height: 0;
+    overflow: auto;
+    padding: 24px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .ota-step-panel {
+    width: 100%;
+    max-width: 720px;
     display: flex;
     flex-direction: column;
     gap: 18px;
   }
 
-  .ota-header,
-  .ota-status-heading,
   .ota-progress-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 14px;
-  }
-
-  .ota-header h2,
-  .ota-status-heading h2 {
-    margin: 0;
-    font-size: 24px;
-    line-height: 1.15;
   }
 
   .ota-field-grid {
@@ -1153,23 +1343,6 @@ button:disabled {
     height: 1px;
     overflow: hidden;
     clip: rect(0, 0, 0, 0);
-  }
-
-  .ota-action-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 10px;
-  }
-
-  .ota-start-button {
-    width: 100%;
-  }
-
-  .ota-status-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-    min-height: 0;
   }
 
   .ota-progress-track {
@@ -1230,6 +1403,12 @@ button:disabled {
     gap: 8px;
   }
 
+  .ota-console-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
   .ota-console-output {
     min-height: 0;
     flex: 1;
@@ -1283,6 +1462,404 @@ button:disabled {
 
   .danger-icon {
     color: var(--err);
+  }
+
+  .ota-instruction {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 36px;
+  }
+
+  .ota-instruction-text {
+    max-width: 360px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .ota-instruction-badge {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border: 1px solid var(--line-2);
+    border-radius: 999px;
+    background: var(--bg-2);
+    color: var(--fg-2);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .ota-instruction-text h3 {
+    margin: 0;
+    color: var(--fg-0);
+    font-size: 20px;
+    line-height: 1.2;
+  }
+
+  .ota-instruction-text p {
+    margin: 0;
+    color: var(--fg-1);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .hint-red {
+    color: var(--red);
+  }
+
+  .hint-green {
+    color: var(--ok);
+  }
+
+  .device-hint {
+    flex: 0 0 auto;
+    width: 132px;
+    height: 176px;
+    display: grid;
+    place-items: center;
+  }
+
+  .device-hint-body {
+    position: relative;
+    width: 96px;
+    height: 150px;
+    padding: 18px 0;
+    border: 1px solid var(--line-2);
+    border-radius: 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(160deg, var(--bg-3), var(--bg-2));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), var(--shadow-panel);
+  }
+
+  .device-hint-led {
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    background: var(--fg-3);
+  }
+
+  .device-hint-button {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--line-2);
+    border-radius: 999px;
+    background: var(--bg-4);
+  }
+
+  .device-hint-button-ring {
+    position: absolute;
+    inset: -6px;
+    border: 2px solid transparent;
+    border-radius: 999px;
+  }
+
+  .device-hint-red-blink .device-hint-led {
+    background: var(--ok);
+    animation: led-tap-green-red 5s ease-in-out infinite;
+  }
+
+  .device-hint-red-blink .device-hint-button-ring {
+    border-color: color-mix(in srgb, var(--ok) 55%, transparent);
+    animation: ring-tap-5x 5s ease-out infinite;
+  }
+
+  .device-hint-green-hold .device-hint-led {
+    background: var(--ok);
+    animation: led-hold-green 9s ease-in-out infinite;
+  }
+
+  .device-hint-green-hold .device-hint-button {
+    background: color-mix(in srgb, var(--ok) 22%, var(--bg-4));
+    border-color: color-mix(in srgb, var(--ok) 46%, var(--line-2));
+    animation: button-hold-press 9s ease-in-out infinite;
+  }
+
+  .device-hint-green-hold .device-hint-button-ring {
+    border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+    animation: ring-hold-steady 9s ease-in-out infinite;
+  }
+
+  /* Sleep step: the LED flashes green on each of the 5 taps, then settles to a
+     steady red once the device enters sleep mode. */
+  @keyframes led-tap-green-red {
+    /* baseline: green, off (between taps) */
+    0% {
+      background: var(--ok);
+      box-shadow: 0 0 12px 2px color-mix(in srgb, var(--ok) 60%, transparent);
+      opacity: 0.12;
+    }
+    /* one green flash per tap (5 taps) */
+    2% {
+      opacity: 1;
+    }
+    6% {
+      opacity: 0.12;
+    }
+    10% {
+      opacity: 1;
+    }
+    14% {
+      opacity: 0.12;
+    }
+    18% {
+      opacity: 1;
+    }
+    22% {
+      opacity: 0.12;
+    }
+    26% {
+      opacity: 1;
+    }
+    30% {
+      opacity: 0.12;
+    }
+    34% {
+      opacity: 1;
+    }
+    38% {
+      opacity: 0.12;
+    }
+    /* ~1s pause with the LED off */
+    58% {
+      background: var(--ok);
+      box-shadow: 0 0 12px 2px color-mix(in srgb, var(--ok) 60%, transparent);
+      opacity: 0.12;
+    }
+    /* red turns on, holds, then fades out */
+    62% {
+      background: var(--red);
+      box-shadow: 0 0 14px 3px color-mix(in srgb, var(--red) 65%, transparent);
+      opacity: 1;
+    }
+    82% {
+      background: var(--red);
+      box-shadow: 0 0 14px 3px color-mix(in srgb, var(--red) 65%, transparent);
+      opacity: 1;
+    }
+    94% {
+      background: var(--red);
+      box-shadow: 0 0 14px 3px color-mix(in srgb, var(--red) 65%, transparent);
+      opacity: 0;
+    }
+    100% {
+      background: var(--red);
+      opacity: 0;
+    }
+  }
+
+  /* Boot step: LED holds steady green while the button is pressed, then blinks
+     green 5 times and stops. */
+  @keyframes led-hold-green {
+    /* solid green while the button is held (~5s, no pulsing) */
+    0% {
+      background: var(--ok);
+      box-shadow: 0 0 14px 3px color-mix(in srgb, var(--ok) 55%, transparent);
+      opacity: 1;
+    }
+    45% {
+      background: var(--ok);
+      box-shadow: 0 0 14px 3px color-mix(in srgb, var(--ok) 55%, transparent);
+      opacity: 1;
+    }
+    /* button is released now and the LED blinks 5 times in green */
+    47% {
+      opacity: 0.12;
+    }
+    49% {
+      opacity: 1;
+    }
+    52% {
+      opacity: 0.12;
+    }
+    54% {
+      opacity: 1;
+    }
+    57% {
+      opacity: 0.12;
+    }
+    59% {
+      opacity: 1;
+    }
+    62% {
+      opacity: 0.12;
+    }
+    64% {
+      opacity: 1;
+    }
+    67% {
+      opacity: 0.12;
+    }
+    69% {
+      opacity: 1;
+    }
+    72% {
+      opacity: 0.12;
+    }
+    /* after the five green blinks, the user can start the OTA */
+    83% {
+      background: var(--ok);
+      box-shadow: 0 0 14px 3px color-mix(in srgb, var(--ok) 55%, transparent);
+      opacity: 0;
+    }
+    100% {
+      background: var(--ok);
+      box-shadow: none;
+      opacity: 0;
+    }
+  }
+
+  /* Five click pulses synced with the green LED flashes, then idle while the
+     LED turns red. */
+  @keyframes ring-tap-5x {
+    0%,
+    8%,
+    16%,
+    24%,
+    32% {
+      transform: scale(0.7);
+      opacity: 0;
+    }
+    2%,
+    10%,
+    18%,
+    26%,
+    34% {
+      transform: scale(0.85);
+      opacity: 0.9;
+    }
+    7%,
+    15%,
+    23%,
+    31%,
+    39%,
+    100% {
+      transform: scale(1.4);
+      opacity: 0;
+    }
+  }
+
+  /* Boot step: button is pressed and held (no pulsing), then released before
+     the green LED blinks. */
+  @keyframes button-hold-press {
+    0% {
+      transform: scale(1);
+      box-shadow: none;
+    }
+    2%,
+    45% {
+      transform: scale(0.9);
+      box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.55);
+    }
+    49%,
+    100% {
+      transform: scale(1);
+      box-shadow: none;
+    }
+  }
+
+  /* Steady (non-pulsing) glow ring while the button is held, gone once released. */
+  @keyframes ring-hold-steady {
+    0% {
+      opacity: 0;
+    }
+    3%,
+    45% {
+      opacity: 0.5;
+    }
+    49%,
+    100% {
+      opacity: 0;
+    }
+  }
+
+  .ota-run {
+    min-height: 0;
+  }
+
+  .ota-run-summary {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 16px;
+    border: 1px solid var(--line-1);
+    border-radius: 8px;
+    background: var(--bg-2);
+  }
+
+  .ota-run-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+  }
+
+  .ota-run-meta-item {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 2px;
+    color: var(--fg-3);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .ota-run-meta-item strong {
+    overflow-wrap: anywhere;
+    color: var(--fg-0);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .ota-run-state-icon {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    color: var(--acc);
+  }
+
+  .ota-wizard-footer {
+    flex: 0 0 auto;
+    padding: 14px 24px;
+    border-top: 1px solid var(--line-1);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-2);
+  }
+
+  .ota-footer-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ota-footer-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ota-wizard-footer .control-button {
+    min-height: 36px;
+    padding: 0 16px;
+  }
+
+  .ota-next-button {
+    min-width: 132px;
   }
 
   .spin {

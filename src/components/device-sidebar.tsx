@@ -78,20 +78,18 @@ export function DeviceSidebar({
   const filteredDevices = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    const visibleDevices = devices.filter((device) => {
-        const type = getDeviceType(device);
-        if (!type) {
-          return false;
-        }
+    return devices.filter((device) => {
+      const type = getDeviceType(device);
+      if (!type) {
+        return false;
+      }
 
-        if (!normalizedQuery) {
-          return true;
-        }
+      if (!normalizedQuery) {
+        return true;
+      }
 
-        return `${getDeviceName(device)} ${device.localName ?? ""} ${device.id}`.toLowerCase().includes(normalizedQuery);
-      });
-
-    return [...visibleDevices].sort((first, second) => second.lastSeenAt - first.lastSeenAt);
+      return `${getDeviceName(device)} ${device.localName ?? ""} ${device.id}`.toLowerCase().includes(normalizedQuery);
+    });
   }, [devices, query]);
 
   return (

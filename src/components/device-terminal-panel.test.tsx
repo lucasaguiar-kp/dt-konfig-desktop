@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { BleCharacteristic, BleClient, BleDevice, BleNotification } from "../lib/ble/types";
+import { useCommandHistoryStore } from "../stores/command-history-store";
 import { useUserCommandsStore } from "../stores/user-commands-store";
 import { DeviceTerminalPanel } from "./device-terminal-panel";
 
@@ -53,6 +54,9 @@ describe("DeviceTerminalPanel", () => {
       devicePinnedCommandIds: {},
       initializedDeviceIds: [],
       hasHydrated: true,
+    });
+    useCommandHistoryStore.setState({
+      deviceCommandHistory: {},
     });
   });
 
@@ -178,5 +182,29 @@ describe("DeviceTerminalPanel", () => {
 
     expect(input).toHaveValue("AT+CFG");
     expect(screen.queryByRole("listbox", { name: "Historico de comandos enviados" })).not.toBeInTheDocument();
+  });
+
+  it("keeps sent command history after remounting the terminal panel", async () => {
+    const client = new PanelTestClient();
+    const { unmount } = render(<DeviceTerminalPanel device={device} bleClient={client} autoConnect />);
+
+    await waitFor(() => expect(client.connectCalls).toEqual(["device-1"]));
+
+    const input = screen.getByLabelText("Entrada do terminal");
+    const sendButton = screen.getByRole("button", { name: "Enviar" });
+
+    fireEvent.change(input, { target: { value: "AT+CFG" } });
+    fireEvent.click(sendButton);
+    await waitFor(() => expect(input).toHaveValue(""));
+
+    unmount();
+
+    render(<DeviceTerminalPanel device={device} bleClient={new PanelTestClient()} autoConnect />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Historico de comandos enviados" }));
+
+    expect(screen.getByRole("listbox", { name: "Historico de comandos enviados" })).toHaveTextContent(
+      "AT+CFG",
+    );
   });
 });

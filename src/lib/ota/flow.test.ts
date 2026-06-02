@@ -48,6 +48,29 @@ describe("OTA flow helpers", () => {
     expect(client.onDeviceDiscovered).toHaveBeenCalledBefore(client.startScan);
   });
 
+  it("matches the IMEI against the device localName when the GAP name is absent", async () => {
+    vi.useFakeTimers();
+    const client = new ScanOnlyBleClient();
+
+    const promise = findDeviceByImei({
+      bleClient: client as unknown as BleClient,
+      imei: "861275072547918",
+      timeoutMs: 90_000,
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    client.emit({
+      id: "dev-1",
+      name: "NULL",
+      localName: "861275072547918",
+      rssi: -50,
+      lastSeenAt: 0,
+    });
+
+    await expect(promise).resolves.toMatchObject({ id: "dev-1" });
+    expect(client.stopScan).toHaveBeenCalledTimes(1);
+  });
+
   it("times out IMEI search after the requested scan window", async () => {
     vi.useFakeTimers();
     const client = new ScanOnlyBleClient();

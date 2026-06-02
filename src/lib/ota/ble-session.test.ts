@@ -7,6 +7,7 @@ import type { NotificationTarget } from "./types";
 class NotificationBleClient implements BleClient {
   devices: BleDevice[] = [];
   characteristics: BleCharacteristic[] = [];
+  notificationCallback: ((notification: BleNotification) => void) | null = null;
   startScan = vi.fn(async () => {});
   stopScan = vi.fn(async () => {});
   connect = vi.fn(async () => {});
@@ -17,7 +18,12 @@ class NotificationBleClient implements BleClient {
   write = vi.fn(async () => {});
   writeWithoutResponse = vi.fn(async () => {});
   onDeviceDiscovered = vi.fn(async () => () => {});
-  onNotification = vi.fn(async (_callback: (notification: BleNotification) => void) => () => {});
+  onNotification = vi.fn(async (callback: (notification: BleNotification) => void) => {
+    this.notificationCallback = callback;
+    return () => {
+      this.notificationCallback = null;
+    };
+  });
 }
 
 const notifyTarget: NotificationTarget = {
@@ -107,6 +113,22 @@ describe("OtaBleSession notifications", () => {
     expect(trace.some((message) => message.includes("AT+TX FLASH"))).toBe(true);
     expect(trace.some((message) => message.includes("payload redigido"))).toBe(true);
     expect(trace.join("\n")).not.toContain("secret");
+  });
+
+  it("traces the Dragino bootloader banner with any version suffix", async () => {
+    const client = new NotificationBleClient();
+    const trace: string[] = [];
+    const session = new OtaBleSession(client, "device-1", undefined, (message) => trace.push(message));
+
+    await session.startPersistentListener();
+    client.notificationCallback?.({
+      deviceId: "device-1",
+      serviceUuid: notifyTarget.serviceUuid,
+      characteristicUuid: notifyTarget.charUuid,
+      value: Array.from("DRAGINO NB bootloader v1.3\r\n", (char) => char.charCodeAt(0)),
+    });
+
+    expect(trace).toContain("BOOTLOADER banner recebido: DRAGINO NB bootloader v1.3");
   });
 
   it("prioritizes the requested write characteristic when multiple write targets exist", async () => {

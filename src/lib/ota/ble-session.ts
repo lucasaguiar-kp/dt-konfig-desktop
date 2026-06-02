@@ -13,6 +13,7 @@ import type { BleUuidPair, NotificationTarget, OtaUuids, WaitResponseResult } fr
 
 const TRACE_ASCII_PREVIEW_LENGTH = 96;
 const TRACE_HEX_PREVIEW_LENGTH = 96;
+const BOOTLOADER_BANNER_PATTERN = /DRAGINO NB bootloader v[^\s\r\n"]+/i;
 
 function pushUniquePair<T extends { serviceUuid: string; charUuid: string }>(list: T[], value: T): void {
   if (list.some((item) => item.serviceUuid === value.serviceUuid && item.charUuid === value.charUuid)) {
@@ -98,6 +99,7 @@ export class OtaBleSession {
   private enabledNotifyTargets: NotificationTarget[] = [];
   private asciiBuffer = "";
   private hexBuffer = "";
+  private lastBootloaderBanner: string | null = null;
 
   constructor(
     private readonly bleClient: BleClient,
@@ -133,6 +135,7 @@ export class OtaBleSession {
   clearNotificationBuffer(): void {
     this.asciiBuffer = "";
     this.hexBuffer = "";
+    this.lastBootloaderBanner = null;
   }
 
   getNotificationSnapshot(): { ascii: string; hex: string } {
@@ -240,6 +243,11 @@ export class OtaBleSession {
 
     this.asciiBuffer += asciiRaw;
     this.hexBuffer += hex;
+    const bootloaderBanner = this.asciiBuffer.match(BOOTLOADER_BANNER_PATTERN)?.[0] ?? null;
+    if (bootloaderBanner && bootloaderBanner !== this.lastBootloaderBanner) {
+      this.lastBootloaderBanner = bootloaderBanner;
+      this.onTrace?.(`BOOTLOADER banner recebido: ${bootloaderBanner}`);
+    }
     this.onTrace?.(
       `RX notify ${notification.value.length}B ASCII="${printable.substring(0, TRACE_ASCII_PREVIEW_LENGTH)}" HEX=${hex.substring(0, TRACE_HEX_PREVIEW_LENGTH)}`,
     );
