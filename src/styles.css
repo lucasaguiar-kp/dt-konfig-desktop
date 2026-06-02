@@ -185,6 +185,11 @@ button:disabled {
     color: var(--fg-0);
   }
 
+  .titlebar-update-button:disabled {
+    cursor: wait;
+    opacity: 0.78;
+  }
+
   .app-body {
     min-height: 0;
     flex: 1;

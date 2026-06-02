@@ -1,23 +1,25 @@
-import { openUrl } from "@tauri-apps/plugin-opener";
-import { DownloadCloud } from "lucide-react";
+import { relaunch } from "@tauri-apps/plugin-process";
+import { check } from "@tauri-apps/plugin-updater";
+import { DownloadCloud, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import packageJson from "../../package.json";
-import { checkForAppUpdate, type AppUpdateInfo } from "../lib/releases";
 
-const CURRENT_VERSION = packageJson.version;
+type AvailableUpdate = NonNullable<Awaited<ReturnType<typeof check>>>;
+type UpdateState = "idle" | "installing" | "error";
 
 export function AppUpdateButton() {
-  const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
+  const [availableUpdate, setAvailableUpdate] = useState<AvailableUpdate | null>(null);
+  const [state, setState] = useState<UpdateState>("idle");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    checkForAppUpdate(CURRENT_VERSION)
-      .then((info) => {
-        if (!cancelled) setUpdateInfo(info);
+    check()
+      .then((update) => {
+        if (!cancelled) setAvailableUpdate(update);
       })
       .catch(() => {
-        if (!cancelled) setUpdateInfo(null);
+        if (!cancelled) setAvailableUpdate(null);
       });
 
     return () => {
@@ -25,24 +27,36 @@ export function AppUpdateButton() {
     };
   }, []);
 
-  if (!updateInfo) return null;
+  if (!availableUpdate) return null;
 
-  function openRelease() {
-    if (!updateInfo) return;
-    openUrl(updateInfo.releaseUrl).catch(() => {
-      window.open(updateInfo.releaseUrl, "_blank", "noopener,noreferrer");
-    });
+  async function installUpdate(update: AvailableUpdate) {
+    if (state === "installing") return;
+
+    setState("installing");
+    setError(null);
+
+    try {
+      await update.downloadAndInstall();
+      await relaunch();
+    } catch (updateError) {
+      setState("error");
+      setError(updateError instanceof Error ? updateError.message : "Nao foi possivel atualizar o app");
+    }
   }
+
+  const isInstalling = state === "installing";
+  const title = error ?? `Atualizar para v${availableUpdate.version}`;
 
   return (
     <button
       type="button"
       className="titlebar-update-button"
-      onClick={openRelease}
-      title={`Atualizar para v${updateInfo.latestVersion}`}
+      disabled={isInstalling}
+      onClick={() => installUpdate(availableUpdate)}
+      title={title}
     >
-      <DownloadCloud size={14} aria-hidden="true" />
-      Atualizar app
+      {isInstalling ? <Loader2 className="spin" size={14} aria-hidden="true" /> : <DownloadCloud size={14} aria-hidden="true" />}
+      {isInstalling ? "Atualizando" : "Atualizar app"}
     </button>
   );
 }
