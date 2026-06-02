@@ -63,11 +63,13 @@ export function OtaView() {
   const [error, setError] = useState<string | null>(null);
   const [consoleEntries, setConsoleEntries] = useState<OtaConsoleEntry[]>([]);
   const [fullLogCount, setFullLogCount] = useState(0);
+  const [didDownloadLog, setDidDownloadLog] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const consoleRef = useRef<HTMLDivElement | null>(null);
   const traceBufferRef = useRef<OtaConsoleEntry[]>([]);
   const fullLogEntriesRef = useRef<OtaConsoleEntry[]>([]);
   const traceFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const downloadFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentRunPromiseRef = useRef<Promise<void> | null>(null);
   const mountedRef = useRef(true);
   const lastProgressLogRef = useRef(0);
@@ -80,6 +82,9 @@ export function OtaView() {
       mountedRef.current = false;
       abortControllerRef.current?.abort();
       clearTraceQueue();
+      if (downloadFeedbackTimerRef.current !== null) {
+        clearTimeout(downloadFeedbackTimerRef.current);
+      }
     };
   }, []);
 
@@ -170,6 +175,17 @@ export function OtaView() {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
+
+    setDidDownloadLog(true);
+    if (downloadFeedbackTimerRef.current !== null) {
+      clearTimeout(downloadFeedbackTimerRef.current);
+    }
+    downloadFeedbackTimerRef.current = setTimeout(() => {
+      if (mountedRef.current) {
+        setDidDownloadLog(false);
+      }
+      downloadFeedbackTimerRef.current = null;
+    }, 1800);
   }
 
   function updateStatus(message: string) {
@@ -483,12 +499,17 @@ export function OtaView() {
                 <div className="ota-console-actions">
                   <button
                     type="button"
-                    className="icon-button"
+                    className={`icon-button ${didDownloadLog ? "success" : ""}`}
                     onClick={downloadFullLog}
-                    title="Baixar log completo"
+                    title={didDownloadLog ? "Log baixado" : "Baixar log completo"}
+                    aria-label={didDownloadLog ? "Log baixado" : "Baixar log completo"}
                     disabled={!fullLogCount}
                   >
-                    <Download size={15} aria-hidden="true" />
+                    {didDownloadLog ? (
+                      <CheckCircle2 size={15} aria-hidden="true" />
+                    ) : (
+                      <Download size={15} aria-hidden="true" />
+                    )}
                   </button>
                   <button
                     type="button"

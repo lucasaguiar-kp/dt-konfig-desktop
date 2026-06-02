@@ -833,6 +833,12 @@ button:disabled {
     color: var(--err);
   }
 
+  .icon-button.success {
+    border-color: color-mix(in srgb, var(--ok) 44%, var(--line-2));
+    background: color-mix(in srgb, var(--ok) 13%, transparent);
+    color: var(--ok);
+  }
+
   .tiny-button {
     height: 24px;
     padding: 0 9px;

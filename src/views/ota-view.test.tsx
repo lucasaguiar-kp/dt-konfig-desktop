@@ -131,6 +131,7 @@ describe("OtaView", () => {
 
     fireEvent.click(screen.getByTitle("Baixar log completo"));
 
+    expect(screen.getByRole("button", { name: "Log baixado" })).toBeInTheDocument();
     expect(createdLogBlob).not.toBeNull();
     const text = await createdLogBlob!.text();
     expect(text).toContain("trace-0");
