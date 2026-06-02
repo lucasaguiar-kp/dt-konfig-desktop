@@ -42,7 +42,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI0QUI4NUExRUY3RkVEMgpSV1RTL3ZjZVdyaEtDNDRYSEpmdnNGZDRacUdpZ0ZDWkJqWmlSdjhpbkNabnkwSzhxVEp5L1RiUgo=",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUwMzkxM0JEQzAzMkVFQUUKUldTdTdqTEF2Uk01VURXSXBzZ284ek9yRUZPRzFRM0lxM2lLU0dNaE55aGFWeE03dFRLR0R3bm8K",
       "endpoints": [
         "https://github.com/lucasaguiar-kp/dt-konfig-desktop/releases/latest/download/latest.json"
       ]

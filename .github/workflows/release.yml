@@ -68,6 +68,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Sync app version from release tag
+        shell: bash
         env:
           RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
         run: |
@@ -90,6 +91,20 @@ jobs:
           const cargoToml = fs.readFileSync(cargoTomlPath, "utf8").replace(/^version = ".*"$/m, `version = "${version}"`);
           fs.writeFileSync(cargoTomlPath, cargoToml);
           NODE
+
+      - name: Configure updater signing key
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_B64: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_B64 }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY_B64" ]; then
+            echo "::error::Missing TAURI_SIGNING_PRIVATE_KEY_B64 secret"
+            exit 1
+          fi
+
+          SIGNING_KEY_PATH="$RUNNER_TEMP/tauri-updater.key"
+          printf '%s' "$TAURI_SIGNING_PRIVATE_KEY_B64" | base64 --decode > "$SIGNING_KEY_PATH"
+          echo "TAURI_SIGNING_PRIVATE_KEY_PATH=$SIGNING_KEY_PATH" >> "$GITHUB_ENV"
 
       - name: Import Apple Developer certificate
         if: matrix.platform == 'macos-14'
@@ -125,7 +140,6 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
